@@ -1,0 +1,10 @@
+# Only what the Dockerfile copies matters, but keeping the build context small makes
+# builds faster and keeps local state (database, virtual environment) out of the image.
+.git
+.venv
+data
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.vscode
+.idea

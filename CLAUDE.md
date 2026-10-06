@@ -69,10 +69,15 @@ py -3.12 -m venv .venv                                  # Linux/macOS: python3.1
 .venv/Scripts/python -m pytest -q                       # offline, no fixtures downloaded
 .venv/Scripts/python scripts/mutation_check.py --check  # after a refactor: patterns still match?
 .venv/Scripts/python scripts/mutation_check.py          # all mutation checks, about 10 minutes
+.venv/Scripts/python scripts/make_samples.py            # regenerate samples/ (tests pin them)
+docker build -t meridian .                              # about 2 minutes on a cold cache
+docker run --rm -p 8000:8000 meridian                   # add -v meridian-data:/data to keep data
+docker run --rm meridian python -m pytest -q -p no:cacheprovider   # suite on Linux
 ```
 
-Optional environment: `MERIDIAN_DATA_DIR` (default `data/`), `MERIDIAN_MAX_UPLOAD_MB`
-(default 50). Docker arrives in Stage 6; add its commands here then.
+Optional environment: `MERIDIAN_DATA_DIR` (default `data/`, `/data` in Docker),
+`MERIDIAN_MAX_UPLOAD_MB` (default 50). Inside Docker the code folder is read-only to the
+`meridian` user, so pytest's cache must be disabled there.
 
 **File tooling on Windows:** always pass `encoding="utf-8"` when a script reads or writes
 repo files. The default is cp1252, which double-encodes `§` on the way back out.
