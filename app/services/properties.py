@@ -1,10 +1,12 @@
 """Make feature attributes safe to store and serve as JSON (docs/DECISIONS.md D29).
 
-The danger this guards against is a delayed failure. pandas reports a missing value as
-float NaN, in string, number and date columns alike. json.dumps writes NaN without
-complaint, so the database write succeeds, and the error appears only later as a 500
-when Starlette serializes the response with allow_nan=False. Converting here, in the
-loader, means everything downstream handles plain Python values only.
+The danger this guards against is a silent one. pandas reports a missing value as float
+NaN, in string, number and date columns alike. json.dumps writes NaN without complaint,
+so the database stores {"area": NaN}, which is not valid JSON. A route returning a plain
+dict would then fail with a 500, but one with a response_model, as all of ours have, has
+Pydantic turn NaN into null, so the bad data stays hidden in the database. Converting
+here, in the loader, keeps stored data valid and means everything downstream handles
+plain Python values only.
 """
 
 import math

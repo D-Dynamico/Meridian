@@ -127,7 +127,10 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - API tests override `get_processor` (D28): a no-op for upload and status tests, the real
   processor run synchronously for end-to-end tests.
 - The same null-string, null-number, date and int shapefile round-trips through the
-  measurements endpoint with 200 and JSON nulls, not NaN.
+  measurements endpoint with 200 and JSON nulls, not NaN, **and** the stored properties
+  pass SQLite's `json_valid`. The response alone cannot catch a NaN: Pydantic serializes
+  it as null through a `response_model`, so with `to_json_safe` removed the response
+  check stays green and only the stored-text check goes red.
 - Upload KML returns 202, then the file reaches `COMPLETED` with the correct
   `feature_count`.
 - Upload Shapefile zip, same check.
@@ -175,7 +178,7 @@ a test is missing.
 | Trust any projected CRS in metres | Web Mercator test |
 | Trust any projected CRS in metres | EPSG:3857 test |
 | Drop the zip-slip check | Zip-slip test |
-| Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test now; the measurements round-trip test from Stage 4 |
+| Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test, and the stored-text `json_valid` check in the measurements round-trip test |
 | Route imports the processor directly | Architecture guard |
 | Silently assume 4326 without setting the flag | Missing `.prj` test |
 | Return geodesic value equal to projected value | Cross-check agreement is not enough here; add a test that the geodesic path runs on unprojected input |

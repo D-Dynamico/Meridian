@@ -9,6 +9,7 @@ hidden from the schema, so neither form is answered with a redirect
 (docs/DECISIONS.md D18).
 """
 
+import json
 import shutil
 import uuid
 from pathlib import PurePath, PureWindowsPath
@@ -20,13 +21,17 @@ from sqlmodel import func, select
 from app.api.deps import ProcessorDep, SessionDep, SettingsDep
 from app.core.config import FORMAT_BY_EXTENSION
 from app.db import queries
-from app.db.models import File, FileFormat, FileStatus
+from app.db.models import Feature, File, FileFormat, FileStatus, MeasurementType
 from app.schemas.files import (
     FileDetail,
     FileListItem,
     FileListResponse,
+    MeasurementItem,
+    MeasurementsResponse,
+    MeasurementValue,
     Summary,
     UploadResponse,
+    metres,
 )
 
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -127,6 +132,81 @@ def get_file(file_id: uuid.UUID, session: SessionDep):
         totals = queries.file_totals(session, file_id)
         summary = Summary.from_totals(totals.by_type, totals.area_m2, totals.length_m)
     return FileDetail(**file.model_dump(), summary=summary)
+
+
+MEASUREMENTS_RESPONSES = {
+    404: {"description": "File not found"},
+    409: {"description": "File is not COMPLETED (still processing, or FAILED with its reason)"},
+}
+
+
+@router.get(
+    "/{file_id}/measurements",
+    response_model=MeasurementsResponse,
+    response_model_exclude_unset=True,
+    include_in_schema=False,
+)
+@router.get(
+    "/{file_id}/measurements/",
+    response_model=MeasurementsResponse,
+    response_model_exclude_unset=True,
+    responses=MEASUREMENTS_RESPONSES,
+)
+def get_measurements(
+    file_id: uuid.UUID,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    geometry_type: Annotated[str | None, Query(examples=["Polygon"])] = None,
+    include_geometry: bool = True,
+):
+    """Per-feature measurements in file order (docs/API.md §8.4)."""
+    file = _get_or_404(session, file_id)
+    if file.status == FileStatus.FAILED:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"File processing FAILED: {file.error}")
+    if file.status != FileStatus.COMPLETED:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"File is still {file.status.value}")
+
+    total, rows = queries.measurements_page(session, file_id, limit, offset, geometry_type)
+    return MeasurementsResponse(
+        file_id=file_id,
+        count=total,
+        limit=limit,
+        offset=offset,
+        results=[_measurement_item(row, include_geometry) for row in rows],
+    )
+
+
+def _measurement_item(row: Feature, include_geometry: bool) -> MeasurementItem:
+    # Every field is passed explicitly, None included, because the response is sent with
+    # exclude_unset: a field left out here would vanish from the JSON. Only geometry is
+    # left out on purpose, when the caller asked for no geometry.
+    fields = dict(
+        index=row.feature_index,
+        layer=row.layer,
+        geometry_type=row.geometry_type,
+        source_crs=row.source_crs,
+        measurement_method=row.measurement_method,
+        measurement_crs=row.measurement_crs,
+        measurement=_measurement_value(row),
+        geodesic_value=metres(row.geodesic_value),
+        repaired=row.repaired,
+        note=row.note,
+        properties=row.properties,
+    )
+    if include_geometry:
+        fields["geometry"] = None if row.geometry is None else json.loads(row.geometry)
+    return MeasurementItem(**fields)
+
+
+def _measurement_value(row: Feature) -> MeasurementValue | None:
+    if row.value is None:
+        return None
+    if row.measurement_type == MeasurementType.AREA:
+        return MeasurementValue(
+            type="area", value=metres(row.value), unit="m2", hectares=round(row.value / 10_000, 4)
+        )
+    return MeasurementValue(type="length", value=metres(row.value), unit="m", km=round(row.value / 1000, 4))
 
 
 def _get_or_404(session, file_id: uuid.UUID) -> File:

@@ -100,8 +100,8 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
   route reaches the processor only through `Depends(get_processor)`, wired in `main.py`;
   it never imports it, not even lazily (D28).
 - **Nothing from pandas or numpy leaves the loader.** Properties pass through
-  `to_json_safe`, because NaN is written happily by `json.dumps` and only fails later as a
-  500 on GET (D29).
+  `to_json_safe`, because `json.dumps` happily stores NaN as invalid JSON, and Pydantic
+  then hides it as null in responses, so only the stored text shows the damage (D29).
 - **One bad feature never sinks the file.** Each feature is processed inside its own error
   boundary. A feature that fails is recorded with a note and the loop continues. Only
   file-level problems (corrupt zip, missing `.shp`) mark the whole file `FAILED`.

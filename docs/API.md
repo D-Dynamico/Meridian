@@ -160,8 +160,16 @@ Response 200:
 ```
 
 Every result carries every field, using null where there is no value, so clients never have
-to check whether a key exists. The one exception is `geometry`, which is left out entirely
-when `include_geometry=false`. `note` may hold several notes joined with `"; "`, for example
+to check whether a key exists. Two exceptions: `geometry` is left out entirely when
+`include_geometry=false`, and `measurement` carries only the convenience field that matches
+its type (`hectares` for area, `km` for length). Results are in file order (`index`), and
+`count` is the total matching the `geometry_type` filter, not the page size.
+
+`measurement.value` and `geodesic_value` are rounded to 2 decimals in the response,
+hectares and km to 4; stored values are not rounded.
+
+A file that is not `COMPLETED` returns 409: `"File is still PENDING"` (or `PROCESSING`), or
+`"File processing FAILED: <reason>"` for a failed file (`DECISIONS.md` D21). `note` may hold several notes joined with `"; "`, for example
 `"CRS assumed EPSG:4326 (no .prj); repaired invalid geometry"`.
 
 `measurement_method` says how `measurement.value` was computed:
