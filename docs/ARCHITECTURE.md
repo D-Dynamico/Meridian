@@ -144,7 +144,8 @@ Summary figures (counts by type, total area, total length) are computed on read,
      keeps only the base name of the client's filename, writes the file to
      `data/uploads/<id><ext>` (never a client-controlled path), creates a `File` row with
      status `PENDING`, schedules the background task, and returns 202 with the id.
-2. The background task sets status `PROCESSING` and calls the loader.
+2. The background task sets status `PROCESSING` and calls the loader. A file that is not
+   `PENDING` is left alone, so transitions only move forward even if a task runs twice.
 3. The loader:
    - for a zip, verifies it is a real zip, rejects the whole zip if any entry path could
      escape the extraction folder, ignores macOS metadata (`__MACOSX/`, `._*`,
@@ -166,9 +167,15 @@ Summary figures (counts by type, total area, total length) are computed on read,
      in order, which gives each feature its stable index.
 4. The processor records the source CRS and feature count, then loops over features, sending
    each through the measure flow (§6) inside its own error boundary.
-5. All `Feature` rows are written, the file becomes `COMPLETED`, and `completed_at` is set.
-6. A file-level failure at any step sets `FAILED` with the reason in `error`.
-7. The temp folder is always deleted in a `finally` block.
+5. All `Feature` rows are written, the file becomes `COMPLETED`, and `completed_at` is set,
+   in one transaction. File `crs` is the layers' common CRS, `MIXED` if they differ, and
+   always `EPSG:4326` for KML.
+6. A file-level failure at any step sets `FAILED` with the reason in `error`. A
+   `LoaderError` message is shown as-is; any other exception is a bug, logged with its
+   traceback, and reported as "an unexpected server error" without internals. The
+   transaction is rolled back first, so a failed file never keeps partial Feature rows.
+7. The uploaded file is always deleted in a `finally` block, and the loader always
+   removes its extraction folder. Nothing from an upload outlives its processing.
 8. On startup, any file still `PENDING` or `PROCESSING` belongs to a process that no longer
    exists (`BackgroundTasks` lives inside the server process). It is marked `FAILED` with
    the error "Processing was interrupted by a server restart. Please upload the file
