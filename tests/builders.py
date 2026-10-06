@@ -2,13 +2,48 @@
 in the test that uses it and no binary fixtures are committed."""
 
 import io
+import math
 import struct
 import tempfile
 import zipfile
 from pathlib import Path
 
 import geopandas as gpd
+from pyproj import Geod
 from shapely.geometry import LineString, Point, Polygon
+
+GEOD = Geod(ellps="WGS84")
+
+
+# Accuracy fixtures (docs/CRS.md §9.5). Built on the ellipsoid with Geod.fwd, which walks
+# true ground distances. A square drawn in UTM coordinates would measure exactly
+# 1,000,000 m2 in that zone and could not catch a missing or wrong transform.
+
+
+def ground_square(lon: float, lat: float, side: float = 1000.0) -> Polygon:
+    """A side x side metre square on the ground, counter-clockwise from its SW corner."""
+    e_lon, e_lat, _ = GEOD.fwd(lon, lat, 90, side)
+    ne_lon, ne_lat, _ = GEOD.fwd(e_lon, e_lat, 0, side)
+    n_lon, n_lat, _ = GEOD.fwd(lon, lat, 0, side)
+    return Polygon([(lon, lat), (e_lon, e_lat), (ne_lon, ne_lat), (n_lon, n_lat)])
+
+
+def ground_line(lon: float, lat: float, length: float = 1000.0, azimuth: float = 0.0) -> LineString:
+    end_lon, end_lat, _ = GEOD.fwd(lon, lat, azimuth, length)
+    return LineString([(lon, lat), (end_lon, end_lat)])
+
+
+def utm_area_gap(lon: float, lat: float, zone: int) -> float:
+    """Expected projected/geodesic area ratio minus 1, from the UTM scale factor.
+
+    k = 0.9996 * (1 + (dlon * cos(lat))^2 / 2), with dlon in radians from the zone's
+    central meridian; area scales by k^2. Independent of the code under test, so it can
+    tell a right zone from a wrong one, which a 0.25 percent band alone cannot.
+    """
+    central_meridian = -183 + 6 * zone
+    dlon = math.radians(lon - central_meridian)
+    k = 0.9996 * (1 + (dlon * math.cos(math.radians(lat))) ** 2 / 2)
+    return k * k - 1
 
 # Small shapes near Jaipur. Not accuracy fixtures: those are built with Geod.fwd in
 # Stage 3 (docs/CRS.md §9.5).
