@@ -11,13 +11,15 @@ hidden from the schema, so neither form is answered with a redirect
 
 import shutil
 from pathlib import PurePath, PureWindowsPath
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, UploadFile, status
+from sqlmodel import func, select
 
 from app.api.deps import SessionDep, SettingsDep
 from app.core.config import FORMAT_BY_EXTENSION
 from app.db.models import File, FileFormat
-from app.schemas.files import UploadResponse
+from app.schemas.files import FileListItem, FileListResponse, UploadResponse
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -74,6 +76,30 @@ def upload_file(file: UploadFile, session: SessionDep, settings: SettingsDep):
     # No background task yet: the processor arrives in Stage 4, and until then files
     # stay PENDING (docs/WORKFLOWS.md §13).
     return UploadResponse(id=record.id, filename=record.filename, status=record.status)
+
+
+@router.get("", response_model=FileListResponse, include_in_schema=False)
+@router.get("/", response_model=FileListResponse)
+def list_files(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """List uploaded files, newest first (docs/API.md §8.6)."""
+    total = session.exec(select(func.count()).select_from(File)).one()
+    # id breaks ties between uploads with the same timestamp, so pages never overlap.
+    files = session.exec(
+        select(File)
+        .order_by(File.created_at.desc(), File.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return FileListResponse(
+        count=total,
+        limit=limit,
+        offset=offset,
+        results=[FileListItem.model_validate(f, from_attributes=True) for f in files],
+    )
 
 
 def _size_of(upload: UploadFile) -> int:

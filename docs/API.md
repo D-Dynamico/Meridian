@@ -11,7 +11,7 @@ responses once the endpoints exist.
 | POST | `/api/files/` | Upload a file and start processing | 202 |
 | GET | `/api/files/{id}/` | File information and status | 200 |
 | GET | `/api/files/{id}/measurements/` | Per-feature measurements | 200 |
-| GET | `/api/files/` | List uploaded files, newest first (optional) | 200 |
+| GET | `/api/files/` | List uploaded files, newest first (optional, §8.6) | 200 |
 | GET | `/health` | Liveness check (optional) | 200 |
 
 Interactive docs are served at `/docs` by FastAPI.
@@ -185,3 +185,41 @@ extension.
 
 File-level processing problems (corrupt zip, missing parts) do not fail the upload request.
 They surface as `status: FAILED` with `error` set on the file information endpoint.
+
+## §8.6 List files
+
+`GET /api/files/`, newest first. Not required by the brief; it lets a reviewer find the id
+of an earlier upload without keeping it.
+
+Query parameters:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `limit` | 100 | Page size, 1 to 1000 |
+| `offset` | 0 | Page start |
+
+Out-of-range values return 422.
+
+Response 200:
+
+```json
+{
+  "count": 1,
+  "limit": 100,
+  "offset": 0,
+  "results": [
+    {
+      "id": "3f6c1a2e-8b7d-4c1e-9a21-7d4e5f6a8b90",
+      "filename": "survey.kml",
+      "format": "KML",
+      "status": "PENDING",
+      "feature_count": null,
+      "created_at": "2026-10-07T10:15:02Z",
+      "completed_at": null
+    }
+  ]
+}
+```
+
+`count` is the total across all pages. The envelope matches the measurements endpoint
+(§8.4). Ties on `created_at` are broken by `id`, so pages never overlap.

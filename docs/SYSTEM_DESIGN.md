@@ -19,6 +19,7 @@ number at the end of the relevant file, and a row here.
 | 8.3 | File information | [API.md](API.md) |
 | 8.4 | Measurements | [API.md](API.md) |
 | 8.5 | Errors | [API.md](API.md) |
+| 8.6 | List files | [API.md](API.md) |
 | 9 | CRS handling | [CRS.md](CRS.md) |
 | 9.1 | Why degrees fail | [CRS.md](CRS.md) |
 | 9.2 | Per-feature decision steps | [CRS.md](CRS.md) |
