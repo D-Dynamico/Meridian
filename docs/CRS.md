@@ -125,4 +125,4 @@ Record the gaps observed on the sample files in the README's learnings section.
 | Centroid beyond 84°N or 80°S | UTM is undefined there. No projected measurement: `value` and `geodesic_value` both hold the geodesic value, `measurement_method` is `geodesic`, `measurement_crs` is null, note "outside UTM coverage, geodesic value used". |
 | Centroid exactly on the equator or a zone edge | Deterministic rule: latitude 0 counts as north; a longitude on a boundary goes to the higher zone; longitude 180 is clamped to zone 60. |
 | Antimeridian-crossing geometry | Out of scope. Note as a known limitation. |
-| Z coordinates | Ignored for measurement. Noted only when some Z value is non-zero, since GDAL's KML reader returns Z = 0 everywhere. |
+| Z coordinates | Ignored for measurement. Noted only when some Z value is non-zero, since Google Earth exports write Z = 0 on every coordinate and GDAL keeps it. |

@@ -58,7 +58,7 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 **Stage 2: Loader**
 - Zip validation, safe extraction, required-part checks, `.prj` detection.
 - KML reading across every layer, layer name kept per feature.
-- Combined feature set with source CRS.
+- Layers, each a GeoDataFrame in its own CRS (`ARCHITECTURE.md` §5 step 3).
 - Exit: loader tests for multi-layer KML, missing parts, zip-slip and corrupt zips pass.
 
 **Stage 3: CRS and measurement**

@@ -22,6 +22,8 @@ FORMAT_BY_EXTENSION = {".zip": "SHAPEFILE", ".kml": "KML"}
 class Settings:
     data_dir: Path = Path("data")
     max_upload_bytes: int = 50 * 1024 * 1024  # docs/DECISIONS.md D20
+    # Zip bomb guard: the most a Shapefile zip may expand to (docs/DECISIONS.md D25).
+    max_extracted_bytes: int = 500 * 1024 * 1024
     allowed_extensions: frozenset[str] = field(
         default_factory=lambda: frozenset(FORMAT_BY_EXTENSION)
     )
@@ -29,6 +31,11 @@ class Settings:
     @property
     def uploads_dir(self) -> Path:
         return self.data_dir / "uploads"
+
+    @property
+    def work_dir(self) -> Path:
+        """Where the loader extracts zips. Each extraction is removed when it finishes."""
+        return self.data_dir / "work"
 
     @property
     def database_url(self) -> str:

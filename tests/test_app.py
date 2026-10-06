@@ -73,6 +73,7 @@ def test_settings_defaults_need_no_environment(monkeypatch):
     monkeypatch.delenv("MERIDIAN_MAX_UPLOAD_MB", raising=False)
     assert load_settings() == Settings()
     assert Settings().max_upload_mb == 50
+    assert Settings().max_extracted_bytes == 500 * 1024 * 1024
 
 
 def test_settings_read_the_environment(monkeypatch, tmp_path):

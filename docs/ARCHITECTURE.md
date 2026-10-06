@@ -64,7 +64,8 @@ app/
   db/session.py        Engine creation (SQLite thread and foreign-key settings), tables
   schemas/files.py     Pydantic response models
   services/
-    loader.py          Zip validation and safe extraction, KML reading, layer iteration
+    loader.py          Zip validation and safe extraction, KML reading, layer iteration.
+                       Returns layers, each a GeoDataFrame in its own CRS
     crs.py             Source CRS detection, UTM selection, transformer cache
     measure.py         Area and length per geometry type, make_valid, notes
     processor.py       Orchestrates loader, crs, measure and database writes
@@ -139,13 +140,22 @@ Summary figures (counts by type, total area, total length) are computed on read,
      status `PENDING`, schedules the background task, and returns 202 with the id.
 2. The background task sets status `PROCESSING` and calls the loader.
 3. The loader:
-   - for a zip, verifies it is a real zip, rejects any entry path that escapes the extraction
-     folder, ignores macOS metadata (`__MACOSX/` and `._*` entries), matches extensions
-     case-insensitively, requires `.shp`, `.shx` and `.dbf` for each shapefile, and notes
-     whether each one has a `.prj`;
+   - for a zip, verifies it is a real zip, rejects the whole zip if any entry path could
+     escape the extraction folder, ignores macOS metadata (`__MACOSX/`, `._*`,
+     `.DS_Store`), matches extensions case-insensitively, requires `.shp`, `.shx` and
+     `.dbf` for each shapefile (GDAL would read a shapefile without its `.dbf` and silently
+     drop every attribute), refuses a zip whose declared sizes add up to more than 500 MB,
+     and extracts each shapefile's parts under fixed names (`<n>/layer.shp`), so no name
+     from the zip ever reaches the file system. A missing `.prj` shows up as a layer with
+     no CRS;
    - for a KML, lists every layer and reads each one (pyogrio reads only the first layer
-     when none is named, and only warns about it);
-   - returns one combined feature set with a `layer` column and a per-layer source CRS.
+     when none is named, and only warns about it). Nested folders become separate, flat
+     layers; GDAL names duplicate folders `Plots (#2)` and unnamed ones `Layer2`. LIBKML
+     display fields are dropped (`DECISIONS.md` D26);
+   - returns a list of layers, each a GeoDataFrame in its own CRS. A single combined
+     GeoDataFrame is not possible, because it carries one CRS and a zip can hold
+     shapefiles in several. The processor walks the layers in order, which gives each
+     feature its stable index.
 4. The processor records the source CRS and feature count, then loops over features, sending
    each through the measure flow (§6) inside its own error boundary.
 5. All `Feature` rows are written, the file becomes `COMPLETED`, and `completed_at` is set.
@@ -176,8 +186,8 @@ Summary figures (counts by type, total area, total length) are computed on read,
    `measurement_crs` is null, note "outside UTM coverage, geodesic value used"
    (`CRS.md` §9.6). Every other measured feature has `measurement_method` `projected`.
 7. **Z values present:** measure in 2D. Note "Z ignored" only when some Z value is
-   non-zero, because GDAL's KML reader returns Z = 0 on every vertex and the note would
-   otherwise appear on every KML feature.
+   non-zero. GDAL keeps whatever the file has, and Google Earth exports write `,0` on
+   every coordinate, so the note would otherwise appear on nearly every KML feature.
 8. **Anything else** (GeometryCollection as input, unknown types): no measurement, note
    "unsupported geometry type". Never raise.
 9. **Unexpected exception** inside a single feature: caught by the processor, recorded as a
@@ -197,6 +207,11 @@ reason for no measurement or the geodesic fallback.
 | Zip missing `.shp`, `.shx` or `.dbf` | Loader | File `FAILED`, naming the missing parts |
 | Zip with several shapefiles | Loader | Each read as its own layer with its own CRS; file `crs` is `MIXED` if they differ |
 | Zip made on macOS (`__MACOSX/`, `._*`) | Loader | Metadata entries ignored |
+| Zip expanding past 500 MB | Loader | File `FAILED` before anything is extracted |
+| Password-protected zip | Loader | File `FAILED`, "not supported" |
+| Shapefile GDAL cannot read | Loader | File `FAILED`, naming the shapefile |
+| KML with no placemarks | Loader | No layers; `COMPLETED` with `feature_count` 0 |
+| Malformed KML | Loader | File `FAILED` with GDAL's parse error, server paths removed |
 | Missing `.prj` | CRS service | See `CRS.md` §9.6 |
 | Multi-folder KML | Loader | Every layer read, name kept |
 | Zero features | Processor | `COMPLETED` with `feature_count` 0 |

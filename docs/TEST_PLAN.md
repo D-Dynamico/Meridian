@@ -37,7 +37,15 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 | Empty geometry | Null measurement, note |
 | Polygon beyond 84°N | Geodesic value, null `measurement_crs`, note |
 | Corrupt zip (random bytes) | File `FAILED` |
-| Zip with an entry path containing `../` | Rejected, nothing written outside the temp folder |
+| Zip with an entry path containing `../`, an absolute path or a drive letter | Rejected, nothing written outside the temp folder |
+| Zip whose declared sizes exceed the extraction limit | Refused before extraction |
+| Zip entry with a bad CRC | File `FAILED` as corrupt |
+| Zip with the encrypted flag set | File `FAILED`, "not supported" |
+| Two shapefiles with the same name in different folders | Layer names are their paths in the zip |
+| Shapefile in a subfolder of the zip | Found and read |
+| KML with nested folders | Each folder is its own layer |
+| KML with no placemarks | No layers, no error |
+| Malformed KML | `FAILED`; message has no server path |
 | Polygon in the southern hemisphere | Uses an EPSG 327xx zone |
 
 ## §16 Per-module test requirements
@@ -76,8 +84,14 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 
 **services/loader**
 - Multi-layer KML returns every layer.
-- Missing required shapefile parts are named in the error.
-- Zip-slip entries are rejected.
+- KML display fields are dropped, unused standard fields are dropped, ExtendedData and
+  used standard fields are kept.
+- Missing required shapefile parts are named in the error, every missing part listed.
+- Zip-slip entries are rejected. Backslash traversal is tested on `_safe_members`
+  directly, because zipfile converts backslashes to "/" on Windows before the loader
+  sees them, so a zip-based test can only exercise that path on Linux.
+- Zips over the extraction limit, with bad CRCs or encrypted entries fail cleanly.
+- Error messages never contain the server's temp paths.
 - Corrupt zip fails cleanly.
 - macOS metadata entries are ignored; upper-case extensions are accepted.
 - Shapefiles with different CRSs keep their own CRS per layer.

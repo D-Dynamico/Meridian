@@ -34,13 +34,12 @@ update the row and explain the change in the session note; do not delete the his
 | D23 | Runtime | Python 3.12, `python:3.12-slim` in Docker | Full Debian image with system GDAL; Python 3.13 | pyogrio and pyproj wheels bundle GDAL and PROJ, so the slim image needs no system packages. 3.12 matches the development machine. |
 | D24 | Where the size limit is enforced | ASGI middleware on the upload path, plus an exact file-size check in the route | Check in the route only; Starlette `max_part_size`; reverse proxy limit | FastAPI parses the whole multipart body before any dependency or handler runs, so a route check only fires after the upload is fully received and spooled. The middleware stops it at the header or at the first byte past the limit. It raises `HTTPException` because FastAPI re-raises those from body parsing and turns any other exception into a 400. A reverse proxy is the production answer and is in future scope. |
 
+| D25 | Zip bomb guard | Refuse a zip whose declared uncompressed sizes exceed 500 MB | Count bytes while extracting; no limit | Python's zipfile never yields more bytes than an entry declares, and a header that understates the size fails its CRC check on read (verified). So the declared sizes are a trustworthy upper bound, and byte counting could never trigger. 500 MB is 10 times the upload limit, room for well-compressed `.dbf` text. |
+| D26 | KML system fields | Drop LIBKML display fields (`altitudeMode`, `tessellate`, `extrude`, `visibility`, `drawOrder`, `icon`) always; drop `id`, `Name`, `description`, `timestamp`, `begin`, `end` only when empty for the whole layer; keep every ExtendedData field | Keep all; drop only where null per feature | Decided with real output: LIBKML fills `tessellate`, `extrude` and `visibility` with defaults even when the file does not contain them, so "drop where null" would keep them on every feature, and a real value cannot be told from a default. They only affect display, and Z is not used for measurement, so dropping `altitudeMode` loses nothing measured. |
+| D27 | Loader output | A list of layers, each a GeoDataFrame in its own CRS | One combined GeoDataFrame with a `layer` column | A GeoDataFrame has a single CRS, and one zip can hold shapefiles in different CRSs. |
+
 ## Open decisions
 
 Record new ones here until they are settled, then move them into the table with reasoning.
 
-- KML system fields in `properties`. GDAL's LIBKML driver adds about 11 mostly-null
-  columns to every KML feature (`altitudeMode`, `tessellate`, `extrude`, `visibility`,
-  `drawOrder`, `icon`, `begin`, `end` and similar). Options: keep them all; drop them only
-  where null for that feature; drop them always. Leaning towards dropping a known list
-  only where null, which removes the noise but keeps a real value such as an explicit
-  `altitudeMode`. Decide in Stage 2 with real KML output in front of us.
+- None at the moment.
