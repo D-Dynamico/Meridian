@@ -67,8 +67,8 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 - CRS service: source detection, projected-in-metres shortcut, UTM selection, transformer
   cache, missing-`.prj` rule.
 - Measure service: area, length, points, unsupported types, empty geometry, `make_valid`
-  with polygon-part extraction, Z handling, geodesic cross-check with `abs()`, geodesic
-  fallback beyond UTM limits.
+  with polygon-part extraction, degenerate polygons, Z handling, geodesic cross-check
+  with oriented rings, geodesic fallback beyond UTM limits.
 - Exit: the `Geod.fwd`-built 1 km square and 1 km line fixtures measure within tolerance;
   projected and geodesic agree within 0.25 percent for area and 0.15 percent for length
   (`CRS.md` §9.5); every §16 measure and CRS test passes.

@@ -112,8 +112,10 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
   it says `repaired: true`.
 - **Only UTM is measured in place.** Every other CRS, even one projected in metres such as
   Web Mercator (+22.3% area at 25°N), is transformed to the feature's UTM zone first.
-- **Geodesic area is signed.** `Geod` returns negative area for clockwise rings, and
-  Shapefile exteriors are clockwise. Always take `abs()`, and feed it lon/lat only.
+- **Geodesic area is signed: orient rings, do not just `abs()`.** `Geod` signs area by
+  ring orientation. `abs()` fails for a MultiPolygon with opposite-wound parts and for a
+  hole wound like its exterior, so rings are oriented with `shapely.orient_polygons`
+  first (D30). Feed `Geod` lon/lat only.
 - **Accuracy fixtures are built on the ground.** Use `Geod.fwd`, never a square drawn in UTM,
   which measures exactly 1,000,000 m2 whether or not the CRS code works.
 - **Read every KML layer.** GeoPandas reads only the first layer by default and only warns

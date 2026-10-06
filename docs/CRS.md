@@ -47,8 +47,12 @@ UTM zones measures each in its own zone.
 - UTM is defined only from 80°S to 84°N. Outside that band there is no zone (§9.6).
 - India spans roughly zones 42 to 47. Jaipur and Bengaluru both fall in zone 43
   (EPSG:32643).
-- Transformers are cached per target EPSG code and built with `always_xy=True`, so axis
-  order is always lon, lat.
+- Transformers are cached per (source, target) pair and built with `always_xy=True`, so
+  axis order is always lon, lat. Every feature goes source to EPSG:4326 and then EPSG:4326
+  to its UTM zone, so in practice there is one cached transformer per zone used plus one
+  per source CRS.
+- The Norway and Svalbard zone exceptions are not applied. The plain zone is still a valid
+  projection there, only slightly further from its central meridian.
 
 **Why UTM:** it is the standard projected system in survey work, conformal, metre-based, and
 its distortion is small and well understood inside a zone.
@@ -78,8 +82,14 @@ Purpose:
 Two rules for using it:
 
 - **Input must be lon/lat.** A projected source is transformed to EPSG:4326 first.
-- **Area is signed.** `Geod.geometry_area_perimeter` returns negative area for clockwise
-  rings, and Shapefile exteriors are clockwise by specification. Always take `abs()`.
+- **Area is signed by ring orientation, so orient every ring first.**
+  `Geod.geometry_area_perimeter` returns negative area for clockwise rings, and Shapefile
+  exteriors are clockwise. An earlier version of this rule said "always take `abs()`",
+  and that is not enough: it only fixes the overall sign. A MultiPolygon with one
+  clockwise and one counter-clockwise part of equal size measured 0, and a hole wound the
+  same way as its exterior was added instead of subtracted (1,039,960 m2 instead of
+  959,961 m2). `shapely.orient_polygons` makes exteriors counter-clockwise and holes
+  clockwise, after which the area is correct and positive in every case.
 
 ## §9.5 Accuracy expectations
 
@@ -104,7 +114,12 @@ The largest length gap measured was 0.098 percent.
 
 **Test tolerances:** projected and geodesic agree within **0.25 percent for area** and
 **0.15 percent for length**. Each tolerance sits just above the worst case inside a zone,
-so it allows correct UTM behaviour, yet a wrong zone or swapped axes still fail it badly.
+so it allows correct UTM behaviour, yet swapped axes still fail it badly.
+
+A neighbouring zone, however, can stay inside 0.25 percent. So the tests also compare the
+gap with the scale-factor formula above, which is independent of the code and predicted
+every measured gap to within 0.0022 percent. Matching it within 0.005 percent proves the
+feature was projected in its own zone.
 
 **Fixtures must be built on the ground, not in the projection.** A square built in UTM
 coordinates and measured in the same UTM zone always comes out at exactly 1,000,000 m2 and

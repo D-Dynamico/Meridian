@@ -179,22 +179,30 @@ Summary figures (counts by type, total area, total length) are computed on read,
 1. **Null or empty geometry:** no measurement, note "empty geometry".
 2. **Point or MultiPoint:** no measurement, note "no measurement for point geometries".
 3. **Invalid polygon:** run `make_valid` and set `repaired` to true. `make_valid` can return
-   a GeometryCollection (polygons plus stray lines) or only lines (a zero-area sliver
-   becomes a MultiLineString). Keep only the polygonal parts. If none remain, no
-   measurement, note "degenerate polygon". A repaired polygon is never measured as a
-   length.
+   a GeometryCollection (polygons plus stray lines) or only lines (a polygon that doubles
+   back on itself becomes a MultiLineString). Keep only the polygonal parts. If no area
+   remains, no measurement, note "degenerate polygon". A repaired polygon is never
+   measured as a length. The same applies to a polygon that is valid but collinear:
+   shapely accepts it, so `make_valid` never runs, and transforming it would turn a line
+   that is straight in lon/lat into a curve with a small artificial area (139 m2 for a
+   3 km sliver near Jaipur). "No area" is judged in the source CRS as a ratio, area
+   under a billionth of the bounding box, so it is unitless and never a measurement in
+   degrees (`DECISIONS.md` D31).
 4. **Polygon or MultiPolygon:** ask the CRS service for a measurement CRS (§9), transform,
    take area in m2. Compute the geodesic area from lon/lat coordinates: a geographic
-   source is used as-is, a projected source is first transformed to EPSG:4326. Take the
-   absolute value, because `Geod` returns signed area by ring orientation and Shapefile
-   exteriors are clockwise, which comes back negative.
+   source is used as-is, a projected source is first transformed to EPSG:4326. Orient
+   every ring first (exteriors counter-clockwise, holes clockwise), because `Geod`
+   returns signed area by orientation and `abs()` alone fails for mixed MultiPolygons
+   and same-wound holes (`CRS.md` §9.4, `DECISIONS.md` D30).
 5. **LineString or MultiLineString:** same path, length in m, geodesic length alongside.
 6. **No UTM zone** (centroid beyond 84°N or 80°S): no projected measurement. `value` and
    `geodesic_value` both hold the geodesic value, `measurement_method` is `geodesic`,
    `measurement_crs` is null, note "outside UTM coverage, geodesic value used"
    (`CRS.md` §9.6). Every other measured feature has `measurement_method` `projected`.
-7. **Z values present:** measure in 2D. Note "Z ignored" only when some Z value is
-   non-zero. GDAL keeps whatever the file has, and Google Earth exports write `,0` on
+7. **Z values present:** measure in 2D. Nothing has to strip Z: shapely's area and
+   length, `shapely.transform` and pyproj's `Geod` all work in 2D, and a test pins that a
+   line rising 1000 m over 1 km still measures 1000 m. Note "Z ignored" only when some Z
+   value is non-zero. GDAL keeps whatever the file has, and Google Earth exports write `,0` on
    every coordinate, so the note would otherwise appear on nearly every KML feature.
 8. **Anything else** (GeometryCollection as input, unknown types): no measurement, note
    "unsupported geometry type". Never raise.
@@ -202,7 +210,9 @@ Summary figures (counts by type, total area, total length) are computed on read,
    note, loop continues.
 
 Notes are joined with `"; "` in a fixed order: CRS assumed, repaired, Z ignored, then the
-reason for no measurement or the geodesic fallback.
+reason for no measurement or the geodesic fallback. The first letter of the joined string
+is capitalised, for example "CRS assumed EPSG:4326 (no .prj); repaired invalid geometry"
+or "No measurement for point geometries".
 
 ## §7 Error handling and edge cases
 

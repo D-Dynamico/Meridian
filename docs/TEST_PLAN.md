@@ -23,6 +23,10 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 | Square already in EPSG:32643 | Measured with no transform |
 | Square in EPSG:3857 | Transformed to UTM, not measured in place |
 | Clockwise polygon (Shapefile ring order) | Positive geodesic area |
+| MultiPolygon with one clockwise and one counter-clockwise part | Area is the sum of the parts, not about 0 |
+| Polygon whose hole is wound like its exterior | Hole subtracted |
+| Valid collinear polygon | Null measurement, "degenerate polygon" |
+| Line rising 1000 m over 1 km | 1000 m, not about 1414 m |
 | KML with two folders: one polygon layer, one line-and-point layer | Features from both layers, layer names kept |
 | KML feature whose Z values are all 0 | No "Z ignored" note |
 | Shapefile zip with `.prj` | CRS read correctly |
@@ -32,7 +36,7 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 | Zip with upper-case extensions (`.SHP`, `.DBF`) | Read normally |
 | Zip missing `.dbf` | File `FAILED`, reason names `.dbf` |
 | Self-intersecting "bowtie" polygon | Repaired, positive area, `repaired: true` |
-| Degenerate sliver polygon (zero area) | `make_valid` returns lines; null measurement, note "degenerate polygon" |
+| Polygon that doubles back on itself | `make_valid` returns lines; null measurement, note "degenerate polygon" |
 | Feature with a GeometryCollection | Null measurement, note, no exception |
 | Empty geometry | Null measurement, note |
 | Polygon beyond 84°N | Geodesic value, null `measurement_crs`, note |
@@ -67,15 +71,21 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - Square area within 0.5 percent of 1,000,000 m2.
 - Line length within 0.5 percent of 1,000 m.
 - Projected and geodesic values agree within 0.25 percent for area and 0.15 percent for
-  length, at Jaipur, Bengaluru and the equatorial zone edge.
-- Geodesic area of a clockwise polygon is positive.
+  length, at Jaipur, Bengaluru, the central meridian and the zone edge on the equator,
+  and Johannesburg.
+- The area gap matches the UTM scale-factor formula within 0.005 percent. The 0.25
+  percent band alone would pass a neighbouring zone.
+- Geodesic area of a clockwise polygon is positive. A mixed-orientation MultiPolygon sums
+  its parts, and a same-wound hole is subtracted (`abs()` alone fails both).
 - Geodesic value for a projected source is computed after transforming to lon/lat (compare
   it with the geodesic value of the same feature given in EPSG:4326).
 - MultiPolygon area equals the sum of its parts.
 - Point returns null with a note.
 - GeometryCollection and empty geometry return null with a note and never raise.
 - Bowtie polygon is repaired, only polygon parts are measured, and it is flagged.
-- Degenerate sliver returns null with note "degenerate polygon", never a length.
+- A polygon that repairs to lines, and a valid collinear polygon, both return null with
+  note "degenerate polygon", never a length.
+- A rising line measures its horizontal length; Z is noted only when non-zero.
 - Beyond 84°N returns the geodesic value with a note, `measurement_method` `geodesic`,
   `geodesic_value` filled and null `measurement_crs`.
 - Every measured feature has a non-null `measurement_method` and `geodesic_value`.
@@ -159,7 +169,10 @@ a test is missing.
 | Remove the per-feature error boundary | Processor single-failure test |
 | Remove `make_valid` | Bowtie test |
 | Measure whatever `make_valid` returns, including lines | Degenerate sliver test |
-| Drop `abs()` on the geodesic area | Clockwise polygon test |
+| Drop ring orientation on the geodesic area | Clockwise polygon test |
+| `abs()` instead of ring orientation | Mixed-orientation MultiPolygon and same-wound hole tests |
+| Exact `area == 0` instead of the ratio test | Valid collinear polygon test |
+| Trust any projected CRS in metres | Web Mercator test |
 | Trust any projected CRS in metres | EPSG:3857 test |
 | Drop the zip-slip check | Zip-slip test |
 | Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test now; the measurements round-trip test from Stage 4 |
