@@ -7,8 +7,6 @@ route through Depends(get_processor).
 
 import logging
 import uuid
-from pathlib import Path
-
 import shapely
 from sqlalchemy import Engine
 from sqlmodel import Session, select
@@ -33,11 +31,6 @@ MIXED_CRS = "MIXED"
 INTERRUPTED = "Processing was interrupted by a server restart. Please upload the file again."
 
 
-def upload_path(settings: Settings, file: File) -> Path:
-    extension = ".kml" if file.format == FileFormat.KML else ".zip"
-    return settings.uploads_dir / f"{file.id}{extension}"
-
-
 def process_file(file_id: uuid.UUID, *, engine: Engine, settings: Settings) -> None:
     """Process one file to COMPLETED or FAILED. Never raises: it runs in a background
     task, where an exception would only reach the server log."""
@@ -50,7 +43,7 @@ def process_file(file_id: uuid.UUID, *, engine: Engine, settings: Settings) -> N
         session.add(file)
         session.commit()
 
-        path = upload_path(settings, file)
+        path = settings.upload_path(file.id, file.format.value)
         try:
             loaded = load(path, file.format.value, settings.work_dir, settings.max_extracted_bytes)
             _record(session, file, loaded)
@@ -141,7 +134,7 @@ def recover_interrupted(engine: Engine, settings: Settings) -> int:
         ).all()
         for file in stuck:
             file.status, file.error, file.completed_at = FileStatus.FAILED, INTERRUPTED, utcnow()
-            upload_path(settings, file).unlink(missing_ok=True)
+            settings.upload_path(file.id, file.format.value).unlink(missing_ok=True)
             session.add(file)
         session.commit()
         return len(stuck)

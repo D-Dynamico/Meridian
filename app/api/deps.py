@@ -5,13 +5,19 @@ request, rather than from module globals, lets each test build its own app again
 own temporary database.
 """
 
-from collections.abc import Iterator
+import uuid
+from collections.abc import Callable, Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlmodel import Session
 
 from app.core.config import Settings
+
+# Whatever processes an uploaded file, given its id. The routes only know this shape;
+# main.py binds the real processor (docs/DECISIONS.md D28), and tests swap in their own
+# through app.dependency_overrides.
+Processor = Callable[[uuid.UUID], None]
 
 
 def get_settings(request: Request) -> Settings:
@@ -23,6 +29,11 @@ def get_session(request: Request) -> Iterator[Session]:
         yield session
 
 
+def get_processor(request: Request) -> Processor:
+    return request.app.state.processor
+
+
 # Shorthand for route signatures: "session: SessionDep" instead of repeating Depends.
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[Session, Depends(get_session)]
+ProcessorDep = Annotated[Processor, Depends(get_processor)]

@@ -3,7 +3,9 @@
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session
 
 from app.core.config import Settings, load_settings
 from app.db.models import Feature, File, FileFormat, FileStatus
@@ -82,3 +84,30 @@ def test_settings_read_the_environment(monkeypatch, tmp_path):
     settings = load_settings()
     assert settings.data_dir == tmp_path
     assert settings.max_upload_bytes == 5 * 1024 * 1024
+
+
+# Wiring (docs/DECISIONS.md D28) and startup recovery (D17)
+
+
+def test_upload_is_processed_by_the_real_processor(e2e_client):
+    body = e2e_client.post(
+        "/api/files/",
+        files={"file": ("survey.kml", b'<kml xmlns="http://www.opengis.net/kml/2.2"><Document/></kml>')},
+    ).json()
+    # TestClient ran the background task before returning, so the file is finished.
+    listed = e2e_client.get("/api/files/").json()["results"]
+    assert [(item["id"], item["status"], item["feature_count"]) for item in listed] == [
+        (body["id"], "COMPLETED", 0)
+    ]
+
+
+def test_startup_fails_files_left_unfinished_by_a_previous_process(app, settings):
+    with TestClient(app):  # first start creates the tables
+        pass
+    with Session(app.state.engine) as session:
+        session.add(File(filename="stuck.kml", format=FileFormat.KML, status=FileStatus.PROCESSING))
+        session.commit()
+
+    with TestClient(app) as restarted:
+        item = restarted.get("/api/files/").json()["results"][0]
+    assert item["status"] == "FAILED"

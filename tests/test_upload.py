@@ -37,6 +37,16 @@ def test_kml_upload_returns_202_and_creates_a_pending_row(client, session, setti
     assert record.feature_count is None
 
 
+def test_upload_schedules_the_processor_with_the_file_id(client, scheduled):
+    body = upload(client, "survey.kml").json()
+    assert scheduled == [uuid.UUID(body["id"])]
+
+
+def test_rejected_upload_schedules_nothing(client, scheduled):
+    upload(client, "survey.geojson")
+    assert scheduled == []
+
+
 def test_upload_is_saved_byte_for_byte_under_its_id(client, settings):
     body = upload(client, "survey.kml").json()
     saved = settings.uploads_dir / f"{body['id']}.kml"

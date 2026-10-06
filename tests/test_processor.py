@@ -9,7 +9,7 @@ from app.core.config import Settings
 from app.db.models import Feature, File, FileFormat, FileStatus
 from app.db.session import init_db, make_engine
 from app.services import processor as processor_module
-from app.services.processor import INTERRUPTED, process_file, recover_interrupted, upload_path
+from app.services.processor import INTERRUPTED, process_file, recover_interrupted
 from tests.builders import (
     folder,
     ground_line,
@@ -48,7 +48,7 @@ def add_upload(engine, settings, file_format: FileFormat, content: bytes, status
         session.add(file)
         session.commit()
         session.refresh(file)
-        upload_path(settings, file).write_bytes(content)
+        settings.upload_path(file.id, file.format.value).write_bytes(content)
         return file.id
 
 

@@ -13,10 +13,10 @@ import shutil
 from pathlib import PurePath, PureWindowsPath
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, UploadFile, status
 from sqlmodel import func, select
 
-from app.api.deps import SessionDep, SettingsDep
+from app.api.deps import ProcessorDep, SessionDep, SettingsDep
 from app.core.config import FORMAT_BY_EXTENSION
 from app.db.models import File, FileFormat
 from app.schemas.files import FileListItem, FileListResponse, UploadResponse
@@ -37,7 +37,13 @@ router = APIRouter(prefix="/api/files", tags=["files"])
         415: {"description": "Not a .zip or .kml file"},
     },
 )
-def upload_file(file: UploadFile, session: SessionDep, settings: SettingsDep):
+def upload_file(
+    file: UploadFile,
+    session: SessionDep,
+    settings: SettingsDep,
+    processor: ProcessorDep,
+    background_tasks: BackgroundTasks,
+):
     """Upload a Shapefile .zip or a .kml. Returns 202 at once; processing runs later."""
     # Keep only the base name. python-multipart strips drive-letter paths (C:\...) but
     # passes relative and POSIX paths through. PureWindowsPath splits on both / and \.
@@ -62,7 +68,7 @@ def upload_file(file: UploadFile, session: SessionDep, settings: SettingsDep):
     record = File(filename=filename, format=FileFormat(FORMAT_BY_EXTENSION[extension]))
     # Stored under the generated id, never the client's name, so the client controls
     # nothing about the path on disk.
-    destination = settings.uploads_dir / f"{record.id}{extension}"
+    destination = settings.upload_path(record.id, record.format.value)
     with destination.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
@@ -73,8 +79,9 @@ def upload_file(file: UploadFile, session: SessionDep, settings: SettingsDep):
         destination.unlink(missing_ok=True)
         raise
 
-    # No background task yet: the processor arrives in Stage 4, and until then files
-    # stay PENDING (docs/WORKFLOWS.md §13).
+    # Runs after the response is sent. The processor arrives through a dependency, so
+    # this module never imports it or any geospatial library (docs/DECISIONS.md D28).
+    background_tasks.add_task(processor, record.id)
     return UploadResponse(id=record.id, filename=record.filename, status=record.status)
 
 

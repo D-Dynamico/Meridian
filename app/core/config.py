@@ -32,6 +32,12 @@ class Settings:
     def uploads_dir(self) -> Path:
         return self.data_dir / "uploads"
 
+    def upload_path(self, file_id, file_format: str) -> Path:
+        """Where an upload is stored: named by its id, never by the client's filename.
+        The route writes here and the processor reads and deletes it."""
+        extension = {fmt: ext for ext, fmt in FORMAT_BY_EXTENSION.items()}[file_format]
+        return self.uploads_dir / f"{file_id}{extension}"
+
     @property
     def work_dir(self) -> Path:
         """Where the loader extracts zips. Each extraction is removed when it finishes."""

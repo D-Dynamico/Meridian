@@ -53,14 +53,15 @@ first.
 ```
 app/
   main.py              Composition root. App factory create_app(settings), router
-                       registration, startup (create folders and tables), health check,
-                       and from Stage 4 the wiring of the real processor (D28)
+                       registration, startup (create folders and tables, recover
+                       interrupted files), health check, and the wiring of the real
+                       processor into app.state (D28)
   api/files.py         Routes only. No GeoPandas, Shapely or pyproj imports
   api/upload_limit.py  ASGI middleware enforcing the request-body size limit before
                        FastAPI reads the body
-  api/deps.py          Request-scoped dependencies: settings, database session and (from
-                       Stage 4) get_processor, read from app.state so each test can build
-                       its own app
+  api/deps.py          Request-scoped dependencies: settings, database session and
+                       get_processor, read from app.state so each test can build its own
+                       app and swap the processor
   core/config.py       Upload size limit, allowed extensions, storage paths
   db/models.py         SQLModel tables: File, Feature
   db/session.py        Engine creation (SQLite thread and foreign-key settings), tables
@@ -71,7 +72,8 @@ app/
     properties.py      to_json_safe: NaN, numpy and pandas values to plain JSON (D29)
     crs.py             Source CRS detection, UTM selection, transformer cache
     measure.py         Area and length per geometry type, make_valid, notes
-    processor.py       Orchestrates loader, crs, measure and database writes
+    processor.py       Orchestrates loader, crs, measure and database writes; startup
+                       recovery of interrupted files
 tests/
 samples/               Small files a reviewer can upload immediately
 docs/
