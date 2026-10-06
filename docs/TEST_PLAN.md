@@ -156,6 +156,13 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
   clean subprocess, because an in-process module check depends on test order and can
   silently stop enforcing anything.
 
+**samples** (Stage 6)
+- The committed `samples/survey.kml` is exactly what `scripts/make_samples.py` writes, so
+  the file and the generator that documents it cannot drift apart.
+- Both samples, uploaded through the API with the real processor, give the results the
+  README describes: layers, types, repaired and unsupported notes, ground areas, and the
+  projected gap matching the UTM scale-factor formula, which a neighbouring zone fails.
+
 ## §17 Mutation checks
 
 A mutation check breaks one guard on purpose and confirms that a test fails. A mutation

@@ -941,5 +941,31 @@
     ""
    ]
   ]
+ },
+ {
+  "name": "samples: committed KML edited by hand",
+  "path": "samples/survey.kml",
+  "edits": [
+   [
+    "<value>gravel</value>",
+    "<value>tarmac</value>"
+   ]
+  ],
+  "expect": [
+   "tests/test_samples.py::test_committed_kml_matches_its_generator"
+  ]
+ },
+ {
+  "name": "samples: neighbouring zone for every feature",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "zone = min(int((lon + 180) // 6) + 1, 60)",
+    "zone = 42"
+   ]
+  ],
+  "expect": [
+   "tests/test_samples.py::test_survey_kml_sample"
+  ]
  }
 ]

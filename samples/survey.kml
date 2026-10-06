@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Survey</name>
+    <Folder>
+      <name>Parcels</name>
+      <Placemark>
+        <name>Plot 12</name>
+        <ExtendedData>
+          <Data name="owner">
+            <value>Asha Verma</value>
+          </Data>
+          <Data name="survey_no">
+            <value>112/3</value>
+          </Data>
+        </ExtendedData>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>75.79,26.91,0.0 75.80006706831594,26.909999641154368,0.0 75.80006706831594,26.919024734600363,0.0 75.79,26.919025093445534,0.0 75.79,26.91,0.0</coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark>
+        <name>Plot 14</name>
+        <ExtendedData>
+          <Data name="owner">
+            <value>R. Meena</value>
+          </Data>
+          <Data name="survey_no">
+            <value>114/1</value>
+          </Data>
+        </ExtendedData>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>75.81013413650456,26.91,0.0 75.81516767067049,26.91451245845387,0.0 75.81516767067049,26.909999910288594,0.0 75.81013413650456,26.914512548165217,0.0 75.81013413650456,26.91,0.0</coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Roads</name>
+      <Placemark>
+        <name>Access road</name>
+        <ExtendedData>
+          <Data name="surface">
+            <value>gravel</value>
+          </Data>
+        </ExtendedData>
+        <LineString>
+          <coordinates>75.79,26.91 75.79,26.919025093445534</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Site gate</name>
+        <Point>
+          <coordinates>75.79035592561509,26.910319084987027</coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Reference</name>
+      <Placemark>
+        <name>Benchmark and baseline</name>
+        <MultiGeometry>
+          <Point>
+            <coordinates>75.79,26.91</coordinates>
+          </Point>
+          <LineString>
+            <coordinates>75.79,26.91 75.79302012050059,26.909999967703893</coordinates>
+          </LineString>
+        </MultiGeometry>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
