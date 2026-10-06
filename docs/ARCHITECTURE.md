@@ -52,11 +52,14 @@ first.
 
 ```
 app/
-  main.py              FastAPI app, router registration, startup (create tables)
+  main.py              App factory create_app(settings), router registration, startup
+                       (create folders and tables), health check
   api/files.py         Routes only. No GeoPandas, Shapely or pyproj imports
+  api/deps.py          Request-scoped dependencies: settings and database session, read
+                       from app.state so each test can build its own app
   core/config.py       Upload size limit, allowed extensions, storage paths
   db/models.py         SQLModel tables: File, Feature
-  db/session.py        Engine and session dependency
+  db/session.py        Engine creation (SQLite thread and foreign-key settings), tables
   schemas/files.py     Pydantic response models
   services/
     loader.py          Zip validation and safe extraction, KML reading, layer iteration

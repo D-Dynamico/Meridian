@@ -1,0 +1,18 @@
+# Pinned for reproducible installs. Tested on Python 3.12 (docs/DECISIONS.md D23).
+
+# API
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+sqlmodel==0.0.47
+
+# Geospatial. pyogrio and pyproj wheels bundle GDAL and PROJ, so no system install.
+geopandas==1.2.0
+pyogrio==0.13.0
+shapely==2.1.2
+pyproj==3.8.0
+
+# Tests
+pytest==9.1.1
+# Starlette 1.7 deprecates httpx for its TestClient in favour of httpx2.
+httpx2==2.13.1
