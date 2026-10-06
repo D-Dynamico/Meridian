@@ -67,6 +67,8 @@ py -3.12 -m venv .venv                                  # Linux/macOS: python3.1
 .venv/Scripts/python -m pip install -r requirements.txt # Linux/macOS: .venv/bin/python
 .venv/Scripts/python -m uvicorn app.main:app --reload   # then open http://127.0.0.1:8000/docs
 .venv/Scripts/python -m pytest -q                       # offline, no fixtures downloaded
+.venv/Scripts/python scripts/mutation_check.py --check  # after a refactor: patterns still match?
+.venv/Scripts/python scripts/mutation_check.py          # all mutation checks, about 10 minutes
 ```
 
 Optional environment: `MERIDIAN_DATA_DIR` (default `data/`), `MERIDIAN_MAX_UPLOAD_MB`
@@ -139,7 +141,8 @@ Stage 0 (docs, reviewed against real library behaviour), **Stage 1** (skeleton, 
 model, upload with size middleware, list, health, architecture guard), **Stage 2**
 (loader, JSON-safe properties), **Stage 3** (CRS and measure services) and **Stage 4**
 (processor injected via `get_processor`, file information and measurements endpoints)
-complete; see `docs/sessions/2026-10-07-stage1.md`. Next: **Stage 5**, hardening.
+and **Stage 5** (error messages, automated mutation checks) complete; see
+`docs/sessions/2026-10-07-stage1.md`. Next: **Stage 6**, Dockerfile, samples, README.
 Stages and exit criteria: `docs/WORKFLOWS.md` §13.
 
 Open questions are tracked in the newest session note, not here.
