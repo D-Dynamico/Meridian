@@ -1,0 +1,22 @@
+# Text files are stored and checked out with LF on every platform, so the Dockerfile and
+# shell scripts work in Linux containers even when the repo is cloned on Windows.
+* text=auto eol=lf
+
+# Shapefile parts and archives are binary. Line-ending conversion would silently corrupt
+# them, because a 0x0A byte inside a record would gain a 0x0D in front of it.
+*.shp binary
+*.shx binary
+*.dbf binary
+*.zip binary
+# Patterns are case-sensitive on Linux (Windows ignores case), and exports from some GIS
+# tools use upper-case extensions.
+*.SHP binary
+*.SHX binary
+*.DBF binary
+*.ZIP binary
+
+# Other binary formats that may appear in the repo.
+*.png binary
+*.jpg binary
+*.sqlite binary
+*.db binary
