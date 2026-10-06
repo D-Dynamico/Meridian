@@ -30,6 +30,7 @@ from tests.builders import (  # noqa: E402
     GEOD,
     folder,
     ground_line,
+    ground_rectangle,
     ground_square,
     kml,
     kml_line,
@@ -43,14 +44,6 @@ JAIPUR = (75.79, 26.91)
 BENGALURU = (77.59, 12.97)
 # Fixed zip timestamps, so regenerating unchanged samples gives the same zip entries.
 ZIP_DATE = (2026, 10, 7, 0, 0, 0)
-
-
-def ground_rectangle(lon: float, lat: float, width: float, height: float) -> Polygon:
-    """A width x height metre rectangle on the ground, counter-clockwise from its SW corner."""
-    e_lon, e_lat, _ = GEOD.fwd(lon, lat, 90, width)
-    ne_lon, ne_lat, _ = GEOD.fwd(e_lon, e_lat, 0, height)
-    n_lon, n_lat, _ = GEOD.fwd(lon, lat, 0, height)
-    return Polygon([(lon, lat), (e_lon, e_lat), (ne_lon, ne_lat), (n_lon, n_lat)])
 
 
 def bowtie(lon: float, lat: float, side: float = 500.0) -> Polygon:

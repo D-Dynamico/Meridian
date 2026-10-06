@@ -74,7 +74,7 @@
   "path": "app/api/files.py",
   "edits": [
    [
-    "if _size_of(file) > settings.max_upload_bytes:",
+    "if file.size > settings.max_upload_bytes:",
     "if False:"
    ]
   ]
@@ -232,8 +232,8 @@
   "path": "app/services/loader.py",
   "edits": [
    [
-    "        name = info.filename.replace(\"\\\\\", \"/\")\n        parts = PurePosixPath(name).parts",
-    "        name = info.filename\n        parts = PurePosixPath(name).parts"
+    "    return info.filename.replace(\"\\\\\", \"/\")",
+    "    return info.filename"
    ]
   ]
  },

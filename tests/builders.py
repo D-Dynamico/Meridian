@@ -20,12 +20,16 @@ GEOD = Geod(ellps="WGS84")
 # 1,000,000 m2 in that zone and could not catch a missing or wrong transform.
 
 
-def ground_square(lon: float, lat: float, side: float = 1000.0) -> Polygon:
-    """A side x side metre square on the ground, counter-clockwise from its SW corner."""
-    e_lon, e_lat, _ = GEOD.fwd(lon, lat, 90, side)
-    ne_lon, ne_lat, _ = GEOD.fwd(e_lon, e_lat, 0, side)
-    n_lon, n_lat, _ = GEOD.fwd(lon, lat, 0, side)
+def ground_rectangle(lon: float, lat: float, width: float, height: float) -> Polygon:
+    """A width x height metre rectangle on the ground, counter-clockwise from its SW corner."""
+    e_lon, e_lat, _ = GEOD.fwd(lon, lat, 90, width)
+    ne_lon, ne_lat, _ = GEOD.fwd(e_lon, e_lat, 0, height)
+    n_lon, n_lat, _ = GEOD.fwd(lon, lat, 0, height)
     return Polygon([(lon, lat), (e_lon, e_lat), (ne_lon, ne_lat), (n_lon, n_lat)])
+
+
+def ground_square(lon: float, lat: float, side: float = 1000.0) -> Polygon:
+    return ground_rectangle(lon, lat, side, side)
 
 
 def ground_line(lon: float, lat: float, length: float = 1000.0, azimuth: float = 0.0) -> LineString:

@@ -188,7 +188,7 @@ def _safe_members(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
     """
     members = []
     for info in archive.infolist():
-        name = info.filename.replace("\\", "/")
+        name = _entry_name(info)
         parts = PurePosixPath(name).parts
         if name.startswith("/") or ".." in parts or (parts and ":" in parts[0]):
             raise LoaderError(
@@ -198,6 +198,12 @@ def _safe_members(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
             continue
         members.append(info)
     return members
+
+
+def _entry_name(info: zipfile.ZipInfo) -> str:
+    """The entry's path with "/" separators. zipfile converts backslashes itself only
+    where os.sep is a backslash, so on Linux a backslash traversal arrives intact."""
+    return info.filename.replace("\\", "/")
 
 
 def _is_os_metadata(parts: tuple[str, ...]) -> bool:
@@ -213,15 +219,14 @@ def _shapefile_groups(members: list[zipfile.ZipInfo]) -> dict[str, dict[str, zip
     """
     by_stem: dict[str, dict[str, zipfile.ZipInfo]] = {}
     for info in members:
-        posix = PurePosixPath(info.filename.replace("\\", "/"))
+        posix = PurePosixPath(_entry_name(info))
         key = str(posix.with_suffix("")).lower()
         by_stem.setdefault(key, {})[posix.suffix.lower()] = info
 
     groups = {}
     for parts in by_stem.values():
         if ".shp" in parts:
-            shp_name = parts[".shp"].filename.replace("\\", "/")
-            groups[str(PurePosixPath(shp_name).with_suffix(""))] = parts
+            groups[str(PurePosixPath(_entry_name(parts[".shp"])).with_suffix(""))] = parts
     if not groups:
         raise LoaderError("The zip contains no shapefile (.shp)")
 

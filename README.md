@@ -319,7 +319,9 @@ Each was found by probing the real libraries or by a mutation check. Details are
 
 ## Limitations and future scope
 
-**Known limitations:** one UTM zone is a poor fit for district-sized features or ones
+**Known limitations:** there is no authentication, so anyone who can reach the server
+can list and read every upload, attributes included (UUID ids are unguessable, but the
+list endpoint returns them all); one UTM zone is a poor fit for district-sized features or ones
 that cross zone boundaries (the geodesic value is the better answer there and is always
 reported); antimeridian-crossing geometry is not handled; one server process only,
 because background tasks live inside it; GDAL re-parses a KML for every folder, so a

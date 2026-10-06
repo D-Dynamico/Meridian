@@ -72,7 +72,8 @@ def upload_file(
 
     # The middleware limits the whole request body, envelope included. This checks the
     # file itself against the exact limit.
-    if _size_of(file) > settings.max_upload_bytes:
+    # Starlette counts the bytes while parsing the body, so size is always set here.
+    if file.size > settings.max_upload_bytes:
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"Maximum upload size is {settings.max_upload_label}",
@@ -215,13 +216,3 @@ def _get_or_404(session, file_id: uuid.UUID) -> File:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
     return file
 
-
-def _size_of(upload: UploadFile) -> int:
-    if upload.size is not None:
-        return upload.size
-    # Starlette sets size while parsing; measure the spooled file if it ever does not.
-    position = upload.file.tell()
-    upload.file.seek(0, 2)
-    size = upload.file.tell()
-    upload.file.seek(position)
-    return size
