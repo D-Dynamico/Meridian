@@ -96,16 +96,16 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 
 ## §14 Definition of done and submission
 
-- [ ] All three required endpoints work for both `.zip` Shapefile and `.kml`
-- [ ] Every feature reports index, geometry type, geometry, CRS and properties
-- [ ] Polygons report area, lines report length, points report no measurement
-- [ ] Unsupported geometries return a note, never an error
-- [ ] Geographic input is never measured in degrees
-- [ ] Full test suite passes offline
-- [ ] README covers setup, API with example requests and responses, architecture
+- [x] All three required endpoints work for both `.zip` Shapefile and `.kml`
+- [x] Every feature reports index, geometry type, geometry, CRS and properties
+- [x] Polygons report area, lines report length, points report no measurement
+- [x] Unsupported geometries return a note, never an error
+- [x] Geographic input is never measured in degrees
+- [x] Full test suite passes offline
+- [x] README covers setup, API with example requests and responses, architecture
       (structure, file-processing flow, measurement flow, CRS handling), design decisions,
       learnings and future scope
-- [ ] Sample files included and referenced in the README
-- [ ] Fresh clone to working `/docs` in under five minutes, both with venv and Docker
-- [ ] No em dashes in README or docs
+- [x] Sample files included and referenced in the README
+- [x] Fresh clone to working `/docs` in under five minutes, both with venv and Docker
+- [x] No em dashes in README or docs
 - [ ] Repository is public on GitHub and the link has been shared

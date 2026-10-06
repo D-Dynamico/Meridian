@@ -147,7 +147,9 @@ model, upload with size middleware, list, health, architecture guard), **Stage 2
 (loader, JSON-safe properties), **Stage 3** (CRS and measure services) and **Stage 4**
 (processor injected via `get_processor`, file information and measurements endpoints)
 and **Stage 5** (error messages, automated mutation checks) complete; see
-`docs/sessions/2026-10-07-stage1.md`. Next: **Stage 6**, Dockerfile, samples, README.
+`docs/sessions/2026-10-07-stage1.md`. **Stage 6** (samples, Dockerfile, README,
+fresh-clone check) complete; see `docs/sessions/2026-10-07-stage6.md`. Left for
+submission: making the GitHub repository public, which is the user's call.
 Stages and exit criteria: `docs/WORKFLOWS.md` §13.
 
 Open questions are tracked in the newest session note, not here.

@@ -76,6 +76,8 @@ app/
     processor.py       Orchestrates loader, crs, measure and database writes; startup
                        recovery of interrupted files
 tests/
+scripts/               make_samples.py (writes samples/), mutation_check.py and
+                       mutations.json (TEST_PLAN.md §17)
 samples/               Small files a reviewer can upload immediately
 docs/
 Dockerfile
