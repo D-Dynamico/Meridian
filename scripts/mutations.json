@@ -783,7 +783,7 @@
   "path": "app/main.py",
   "edits": [
    [
-    "    app.state.processor = partial(process_file, engine=engine, settings=settings)",
+    "    app.state.processor = in_processing_threads(\n        partial(process_file, engine=engine, settings=settings), settings.processing_threads\n    )",
     "    app.state.processor = lambda file_id: None"
    ]
   ]
@@ -966,6 +966,97 @@
   ],
   "expect": [
    "tests/test_samples.py::test_survey_kml_sample"
+  ]
+ },
+ {
+  "name": "limits: processing shares the request thread pool",
+  "path": "app/main.py",
+  "edits": [
+   [
+    "await anyio.to_thread.run_sync(process, file_id, limiter=limiter)",
+    "await anyio.to_thread.run_sync(process, file_id)"
+   ]
+  ],
+  "expect": [
+   "tests/test_app.py::test_processing_has_its_own_thread_limit"
+  ]
+ },
+ {
+  "name": "limits: processing thread count ignored",
+  "path": "app/main.py",
+  "edits": [
+   [
+    "limiter = anyio.CapacityLimiter(threads)",
+    "limiter = anyio.CapacityLimiter(40)"
+   ]
+  ],
+  "expect": [
+   "tests/test_app.py::test_processing_has_its_own_thread_limit"
+  ]
+ },
+ {
+  "name": "limits: no KML folder cap",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "if len(layer_names) > max_layers:",
+    "if False:"
+   ]
+  ],
+  "expect": [
+   "tests/test_loader.py::test_kml_with_more_folders_than_the_cap_is_refused"
+  ]
+ },
+ {
+  "name": "limits: KML cap off by one",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "if len(layer_names) > max_layers:",
+    "if len(layer_names) >= max_layers:"
+   ]
+  ],
+  "expect": [
+   "tests/test_loader.py::test_kml_at_the_cap_is_read"
+  ]
+ },
+ {
+  "name": "limits: no shapefile cap",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "if len(groups) > max_layers:",
+    "if False:"
+   ]
+  ],
+  "expect": [
+   "tests/test_loader.py::test_zip_with_more_shapefiles_than_the_cap_is_refused_before_extraction"
+  ]
+ },
+ {
+  "name": "limits: shapefile cap off by one",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "if len(groups) > max_layers:",
+    "if len(groups) >= max_layers:"
+   ]
+  ],
+  "expect": [
+   "tests/test_loader.py::test_zip_at_the_cap_is_read"
+  ]
+ },
+ {
+  "name": "limits: processor ignores the configured cap",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "settings.max_extracted_bytes, settings.max_layers,",
+    "settings.max_extracted_bytes, 10**6,"
+   ]
+  ],
+  "expect": [
+   "tests/test_processor.py::test_layer_cap_comes_from_settings"
   ]
  }
 ]

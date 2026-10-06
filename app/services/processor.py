@@ -47,7 +47,10 @@ def process_file(file_id: uuid.UUID, *, engine: Engine, settings: Settings) -> N
 
         path = settings.upload_path(file.id, file.format.value)
         try:
-            loaded = load(path, file.format.value, settings.work_dir, settings.max_extracted_bytes)
+            loaded = load(
+                path, file.format.value, settings.work_dir,
+                settings.max_extracted_bytes, settings.max_layers,
+            )
             _record(session, file, loaded)
             file.status = FileStatus.COMPLETED
         except LoaderError as exc:

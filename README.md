@@ -186,6 +186,8 @@ Along the way:
 - **Zips are untrusted.** Entries that could escape the folder (zip slip) are rejected,
   zips declaring more than 500 MB uncompressed are refused, and each shapefile must have
   its `.shp`, `.shx` and `.dbf`.
+- **One upload's cost is bounded.** A file may hold at most 100 layers, and processing
+  runs in its own two threads, so a slow file can delay other files but never the API.
 - **Every KML layer is read**, not just the first, and each feature keeps its folder name.
 - **One bad feature never sinks the file.** It gets a note and the loop continues.
 - **Interrupted files are not left hanging.** On startup, anything still `PENDING` or
@@ -279,7 +281,7 @@ alternatives considered for each.
 ## Testing
 
 ```bash
-.venv/bin/python -m pytest -q                                      # 231 tests, about 12 s, offline
+.venv/bin/python -m pytest -q                                      # 237 tests, about 12 s, offline
 docker run --rm meridian python -m pytest -q -p no:cacheprovider   # the same suite on Linux
 ```
 
@@ -289,9 +291,9 @@ docker run --rm meridian python -m pytest -q -p no:cacheprovider   # the same su
 - **Tests assert the EPSG code, not only the area**, because the same square at 56°N and
   56°S measures identically. The projected gap must also match the scale-factor formula,
   which a wrong zone fails.
-- **Mutation checks.** `scripts/mutation_check.py` applies 88 deliberate bugs one at a
+- **Mutation checks.** `scripts/mutation_check.py` applies 95 deliberate bugs one at a
   time (skip the transform, swap lon and lat, read only the first KML layer, drop the
-  zip-slip check, and so on) and confirms each turns a test red. All 88 are caught.
+  zip-slip check, and so on) and confirms each turns a test red. All 95 are caught.
 
 ## Learnings
 
@@ -320,12 +322,14 @@ Each was found by probing the real libraries or by a mutation check. Details are
 **Known limitations:** one UTM zone is a poor fit for district-sized features or ones
 that cross zone boundaries (the geodesic value is the better answer there and is always
 reported); antimeridian-crossing geometry is not handled; one server process only,
-because background tasks live inside it.
+because background tasks live inside it; GDAL re-parses a KML for every folder, so a
+crafted 50 MB KML at the 100-folder cap takes a few minutes of one processing thread.
 
 **Future scope**, deliberately left out:
 
 - **Scale:** a durable queue (Celery or RQ) instead of `BackgroundTasks`, PostGIS instead
-  of SQLite, upload limits at a reverse proxy.
+  of SQLite, upload limits at a reverse proxy, and reading a KML in one pass instead of
+  once per folder.
 - **Measurement:** a local equal-area projection for very large features, perimeter, 3D,
   volume and DEM-based measurement from drone surveys.
 - **Formats:** GeoJSON, GeoPackage and KMZ, each a small change in the loader.

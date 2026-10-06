@@ -151,17 +151,21 @@ Summary figures (counts by type, total area, total length) are computed on read,
      status `PENDING`, schedules the background task, and returns 202 with the id.
 2. The background task sets status `PROCESSING` and calls the loader. A file that is not
    `PENDING` is left alone, so transitions only move forward even if a task runs twice.
+   Processing runs in a thread pool of its own, two files at a time, never in the pool
+   that serves requests, so slow files delay other files but never the API (D32).
 3. The loader:
    - for a zip, verifies it is a real zip, rejects the whole zip if any entry path could
      escape the extraction folder, ignores macOS metadata (`__MACOSX/`, `._*`,
      `.DS_Store`), matches extensions case-insensitively, requires `.shp`, `.shx` and
      `.dbf` for each shapefile (GDAL would read a shapefile without its `.dbf` and silently
-     drop every attribute), refuses a zip whose declared sizes add up to more than 500 MB,
+     drop every attribute), refuses a zip with more than 100 shapefiles (D32) or whose
+     declared sizes add up to more than 500 MB,
      and extracts each shapefile's parts under fixed names (`<n>/layer.shp`), so no name
      from the zip ever reaches the file system. A missing `.prj` shows up as a layer with
      no CRS;
    - for a KML, lists every layer and reads each one (pyogrio reads only the first layer
-     when none is named, and only warns about it). Nested folders become separate, flat
+     when none is named, and only warns about it). More than 100 folders is refused before
+     any is read, because each read parses the whole file again (D32). Nested folders become separate, flat
      layers; GDAL names duplicate folders `Plots (#2)` and unnamed ones `Layer2`. LIBKML
      display fields are dropped (`DECISIONS.md` D26);
    - returns a list of layers, each with its own CRS and a list of features. A single
@@ -238,6 +242,7 @@ or "No measurement for point geometries".
 | Zip with several shapefiles | Loader | Each read as its own layer with its own CRS; file `crs` is `MIXED` if they differ |
 | Zip made on macOS (`__MACOSX/`, `._*`) | Loader | Metadata entries ignored |
 | Zip expanding past 500 MB | Loader | File `FAILED` before anything is extracted |
+| More than 100 shapefiles in a zip, or folders in a KML | Loader | File `FAILED` before any layer is read (D32) |
 | Password-protected zip | Loader | File `FAILED`, "not supported" |
 | Shapefile GDAL cannot read | Loader | File `FAILED`, naming the shapefile |
 | KML with no placemarks | Loader | No layers; `COMPLETED` with `feature_count` 0 |

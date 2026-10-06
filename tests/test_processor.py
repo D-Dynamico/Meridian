@@ -1,5 +1,6 @@
 """services/processor (docs/TEST_PLAN.md §16). Runs the processor directly, no HTTP."""
 
+import dataclasses
 import json
 
 import pytest
@@ -126,6 +127,14 @@ def test_layers_in_different_crss_make_the_file_mixed(engine, settings, tmp_path
     )
     assert file.crs == "MIXED"
     assert sorted(f.source_crs for f in features) == ["EPSG:32643", "EPSG:4326"]
+
+
+def test_layer_cap_comes_from_settings(engine, settings):
+    settings = dataclasses.replace(settings, max_layers=1)
+    document = kml(folder("A", placemark("a", kml_point())) + folder("B", placemark("b", kml_point())))
+    file, features = run(engine, settings, add_upload(engine, settings, FileFormat.KML, document.encode()))
+    assert (file.status, file.error) == (FileStatus.FAILED, "The KML has 2 folders; at most 1 are supported")
+    assert features == []
 
 
 def test_file_with_no_features_completes_with_zero(engine, settings):

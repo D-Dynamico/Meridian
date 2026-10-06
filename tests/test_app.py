@@ -1,7 +1,9 @@
 """Application startup, health and data model basics."""
 
+import threading
 import uuid
 
+import anyio
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +11,7 @@ from sqlmodel import Session
 
 from app.core.config import Settings, load_settings
 from app.db.models import Feature, File, FileFormat, FileStatus
+from app.main import in_processing_threads
 
 
 def test_health(client):
@@ -111,3 +114,35 @@ def test_startup_fails_files_left_unfinished_by_a_previous_process(app, settings
     with TestClient(app) as restarted:
         item = restarted.get("/api/files/").json()["results"][0]
     assert item["status"] == "FAILED"
+
+
+def test_processing_has_its_own_thread_limit():
+    """Slow files must never take the threads that serve requests (docs/DECISIONS.md D32).
+
+    Three files are processed with a limit of one thread, each blocking until released.
+    While they wait, exactly one is running, and the default pool, which serves every
+    plain-def route and /health, has lent out no threads at all.
+    """
+    running, release = [], threading.Event()
+
+    def slow(file_id):
+        running.append(file_id)
+        release.wait(5)
+
+    run = in_processing_threads(slow, threads=1)
+
+    async def main():
+        default_pool = anyio.to_thread.current_default_thread_limiter()
+        async with anyio.create_task_group() as group:
+            for file_id in range(3):
+                group.start_soon(run, file_id)
+            with anyio.fail_after(5):
+                while not running:
+                    await anyio.sleep(0.01)
+            await anyio.sleep(0.2)  # time for a second file to start, if the limit leaked
+            assert len(running) == 1
+            assert default_pool.borrowed_tokens == 0
+            release.set()
+        assert sorted(running) == [0, 1, 2]
+
+    anyio.run(main)

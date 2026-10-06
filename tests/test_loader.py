@@ -22,6 +22,7 @@ from tests.builders import (
 )
 
 MAX_EXTRACTED = 10 * 1024 * 1024
+MAX_LAYERS = 100
 
 
 @pytest.fixture
@@ -29,15 +30,15 @@ def work_dir(tmp_path):
     return tmp_path / "work"
 
 
-def load_kml(tmp_path, work_dir, document: str):
+def load_kml(tmp_path, work_dir, document: str, max_layers=MAX_LAYERS):
     path = tmp_path / "upload.kml"
     path.write_text(document, encoding="utf-8")
-    return load(path, "KML", work_dir, MAX_EXTRACTED)
+    return load(path, "KML", work_dir, MAX_EXTRACTED, max_layers)
 
 
-def load_zip(tmp_path, work_dir, entries: dict[str, bytes], max_extracted=MAX_EXTRACTED):
+def load_zip(tmp_path, work_dir, entries: dict[str, bytes], max_extracted=MAX_EXTRACTED, max_layers=MAX_LAYERS):
     path = write_zip(tmp_path / "upload.zip", entries)
-    return load(path, "SHAPEFILE", work_dir, max_extracted)
+    return load(path, "SHAPEFILE", work_dir, max_extracted, max_layers)
 
 
 def layer_summary(loaded):
@@ -186,7 +187,7 @@ def test_corrupt_zip_fails_cleanly(tmp_path, work_dir):
     path = tmp_path / "upload.zip"
     path.write_bytes(b"PK\x03\x04 these are not really zip contents" * 10)
     with pytest.raises(LoaderError, match="not a valid zip archive"):
-        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED)
+        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED, MAX_LAYERS)
 
 
 def test_entry_with_bad_checksum_fails_as_corrupt(tmp_path, work_dir):
@@ -197,14 +198,14 @@ def test_entry_with_bad_checksum_fails_as_corrupt(tmp_path, work_dir):
     path = tmp_path / "upload.zip"
     path.write_bytes(bytes(data))
     with pytest.raises(LoaderError, match="corrupt"):
-        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED)
+        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED, MAX_LAYERS)
 
 
 def test_password_protected_zip_fails_with_a_clear_message(tmp_path, work_dir):
     path = tmp_path / "upload.zip"
     path.write_bytes(set_flag_bits(zip_bytes(shapefile_parts(plots())), 0x01))
     with pytest.raises(LoaderError, match="Password-protected zips are not supported"):
-        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED)
+        load(path, "SHAPEFILE", work_dir, MAX_EXTRACTED, MAX_LAYERS)
 
 
 def test_unreadable_shapefile_fails_with_its_name(tmp_path, work_dir):
@@ -269,3 +270,35 @@ def test_work_folder_is_empty_after_failure(tmp_path, work_dir):
     with pytest.raises(LoaderError):
         load_zip(tmp_path, work_dir, parts)
     assert list(work_dir.iterdir()) == []
+
+
+# Layer cap (docs/DECISIONS.md D32)
+
+
+def three_folders() -> str:
+    return kml("".join(folder(f"F{i}", placemark("p", kml_point())) for i in range(3)))
+
+
+def test_kml_with_more_folders_than_the_cap_is_refused(tmp_path, work_dir):
+    with pytest.raises(LoaderError) as error:
+        load_kml(tmp_path, work_dir, three_folders(), max_layers=2)
+    assert str(error.value) == "The KML has 3 folders; at most 2 are supported"
+
+
+def test_kml_at_the_cap_is_read(tmp_path, work_dir):
+    assert len(load_kml(tmp_path, work_dir, three_folders(), max_layers=3).layers) == 3
+
+
+def test_zip_with_more_shapefiles_than_the_cap_is_refused_before_extraction(tmp_path, work_dir):
+    parts = shapefile_parts(plots())
+    entries = {**under("a", parts), **under("b", parts), **under("c", parts)}
+    with pytest.raises(LoaderError) as error:
+        load_zip(tmp_path, work_dir, entries, max_layers=2)
+    assert str(error.value) == "The zip contains 3 shapefiles; at most 2 are supported"
+    assert not work_dir.exists()  # refused before anything was extracted
+
+
+def test_zip_at_the_cap_is_read(tmp_path, work_dir):
+    parts = shapefile_parts(plots())
+    entries = {**under("a", parts), **under("b", parts)}
+    assert len(load_zip(tmp_path, work_dir, entries, max_layers=2).layers) == 2

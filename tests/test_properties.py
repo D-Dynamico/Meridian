@@ -109,7 +109,7 @@ def test_shapefile_properties_come_out_plain_and_strictly_serializable(tmp_path)
         crs="EPSG:4326",
     )
     path = write_zip(tmp_path / "upload.zip", shapefile_parts(frame))
-    features = load(path, "SHAPEFILE", tmp_path / "work", 10 * 1024 * 1024).layers[0].features
+    features = load(path, "SHAPEFILE", tmp_path / "work", 10 * 1024 * 1024, 100).layers[0].features
 
     complete, empty = (f.properties for f in features)
     assert complete == {"name": "Plot 12", "area_ha": 1.5, "surveyed": "2026-01-15", "plots": 3}
@@ -126,5 +126,5 @@ def test_no_property_is_nan(tmp_path):
         {"name": [None], "area_ha": [None]}, geometry=[Point(75.8, 26.9)], crs="EPSG:4326"
     )
     path = write_zip(tmp_path / "upload.zip", shapefile_parts(frame))
-    properties = load(path, "SHAPEFILE", tmp_path / "work", 10 * 1024 * 1024).layers[0].features[0].properties
+    properties = load(path, "SHAPEFILE", tmp_path / "work", 10 * 1024 * 1024, 100).layers[0].features[0].properties
     assert not any(isinstance(v, float) and math.isnan(v) for v in properties.values())

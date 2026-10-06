@@ -83,25 +83,35 @@ def load(
     file_format: Literal["SHAPEFILE", "KML"],
     work_dir: Path,
     max_extracted_bytes: int,
+    max_layers: int,
 ) -> LoadedFile:
     """Read every layer of the file. Raises LoaderError for file-level problems.
 
     Zip contents are extracted into a temporary folder under work_dir, which is always
     removed before this returns or raises. Everything is read into memory first.
+
+    max_layers caps the shapefiles in a zip and the folders in a KML, checked before any
+    layer is read (docs/DECISIONS.md D32). Each layer is a separate GDAL read, and for
+    KML each read parses the whole file again, so without a cap a small upload could
+    keep a processing thread busy for hours.
     """
     if file_format == "KML":
-        return _load_kml(path)
-    return _load_shapefile_zip(path, work_dir, max_extracted_bytes)
+        return _load_kml(path, max_layers)
+    return _load_shapefile_zip(path, work_dir, max_extracted_bytes, max_layers)
 
 
 # KML
 
 
-def _load_kml(path: Path) -> LoadedFile:
+def _load_kml(path: Path, max_layers: int) -> LoadedFile:
     try:
         # Every layer must be listed and read by name. Without a layer name, GeoPandas
         # reads only the first folder and merely warns about the rest (D12).
         layer_names = [name for name, _ in pyogrio.list_layers(path)]
+        if len(layer_names) > max_layers:
+            raise LoaderError(
+                f"The KML has {len(layer_names)} folders; at most {max_layers} are supported"
+            )
         layers = [
             _to_layer(name, _clean_kml_frame(gpd.read_file(path, layer=name)))
             for name in layer_names
@@ -128,7 +138,9 @@ def _all_empty(column) -> bool:
 # Shapefile zip
 
 
-def _load_shapefile_zip(path: Path, work_dir: Path, max_extracted_bytes: int) -> LoadedFile:
+def _load_shapefile_zip(
+    path: Path, work_dir: Path, max_extracted_bytes: int, max_layers: int
+) -> LoadedFile:
     try:
         archive = zipfile.ZipFile(path)
     except zipfile.BadZipFile as exc:
@@ -137,6 +149,10 @@ def _load_shapefile_zip(path: Path, work_dir: Path, max_extracted_bytes: int) ->
     with archive:
         members = _safe_members(archive)
         groups = _shapefile_groups(members)
+        if len(groups) > max_layers:
+            raise LoaderError(
+                f"The zip contains {len(groups)} shapefiles; at most {max_layers} are supported"
+            )
         # Zip bomb guard. Checking the declared sizes is enough: Python's zipfile never
         # yields more bytes than an entry declares, and a header that understates the
         # size fails its CRC check on read, which surfaces as a corrupt zip below.

@@ -214,6 +214,8 @@ the 409 from the measurements endpoint. The messages, exactly as returned:
 | Password-protected zip | Password-protected zips are not supported |
 | Entry path escapes the folder | The zip contains an unsafe path that points outside the archive: ../evil.shp |
 | Expands past the limit | The zip expands to more than 500 MB |
+| Too many shapefiles | The zip contains 120 shapefiles; at most 100 are supported |
+| Too many KML folders | The KML has 120 folders; at most 100 are supported |
 | No `.shp` in the zip | The zip contains no shapefile (.shp) |
 | Missing parts | Shapefile 'parcels' is missing .shx and .dbf |
 | GDAL cannot read a shapefile | Shapefile 'parcels' could not be read: 'parcels.shp' not recognized as being in a supported file format |

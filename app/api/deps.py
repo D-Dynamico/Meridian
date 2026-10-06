@@ -6,7 +6,7 @@ own temporary database.
 """
 
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -16,8 +16,9 @@ from app.core.config import Settings
 
 # Whatever processes an uploaded file, given its id. The routes only know this shape;
 # main.py binds the real processor (docs/DECISIONS.md D28), and tests swap in their own
-# through app.dependency_overrides.
-Processor = Callable[[uuid.UUID], None]
+# through app.dependency_overrides. It may be async: the real one is, so it can run in
+# its own thread pool (D32).
+Processor = Callable[[uuid.UUID], Awaitable[None] | None]
 
 
 def get_settings(request: Request) -> Settings:

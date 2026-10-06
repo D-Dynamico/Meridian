@@ -106,12 +106,15 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - macOS metadata entries are ignored; upper-case extensions are accepted.
 - Shapefiles with different CRSs keep their own CRS per layer.
 - Temp folder is removed after success and after failure.
+- More shapefiles or KML folders than the layer cap is refused with a clear message, a
+  zip before anything is extracted; exactly the cap is read (D32).
 
 **services/processor**
 - A single feature that raises is recorded with a note and the rest still complete.
 - Status moves `PENDING` to `PROCESSING` to `COMPLETED`.
 - File-level failure sets `FAILED` with an error message.
 - Files left `PENDING` or `PROCESSING` are marked `FAILED` by the startup recovery.
+- The layer cap comes from `Settings`, not a constant in the loader.
 
 **services/properties** (Stage 2)
 - Every missing or non-finite form (None, NaN, infinity, `pd.NA`, `pd.NaT`, NaT
@@ -155,6 +158,10 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - Importing `app.api.files` does not import GeoPandas, Shapely or pyproj. Check this in a
   clean subprocess, because an in-process module check depends on test order and can
   silently stop enforcing anything.
+
+**processing threads** (D32)
+- Processing runs in its own thread pool: with three blocked files and a limit of one,
+  exactly one runs, and the default pool that serves requests lends out no thread.
 
 **samples** (Stage 6)
 - The committed `samples/survey.kml` is exactly what `scripts/make_samples.py` writes, so

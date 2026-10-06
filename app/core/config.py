@@ -31,6 +31,11 @@ class Settings:
     max_upload_bytes: int = 50 * 1024 * 1024  # docs/DECISIONS.md D20
     # Zip bomb guard: the most a Shapefile zip may expand to (docs/DECISIONS.md D25).
     max_extracted_bytes: int = 500 * 1024 * 1024
+    # Most shapefiles in a zip or folders in a KML (docs/DECISIONS.md D32).
+    max_layers: int = 100
+    # Threads that process uploads, kept apart from the threads that serve requests, so
+    # slow files can delay other files but never the API (docs/DECISIONS.md D32).
+    processing_threads: int = 2
     allowed_extensions: frozenset[str] = field(
         default_factory=lambda: frozenset(FORMAT_BY_EXTENSION)
     )
