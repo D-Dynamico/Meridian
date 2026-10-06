@@ -137,10 +137,10 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 
 Stage 0 (docs, reviewed against real library behaviour), **Stage 1** (skeleton, data
 model, upload with size middleware, list, health, architecture guard), **Stage 2**
-(loader, JSON-safe properties) and **Stage 3** (CRS and measure services) complete; see
-`docs/sessions/2026-10-07-stage1.md`. Uploads stay `PENDING` until Stage 4 wires the
-processor. Next: **Stage 4**, processor (injected via `get_processor`, D28) and the read
-endpoints. Stages and exit criteria: `docs/WORKFLOWS.md` §13.
+(loader, JSON-safe properties), **Stage 3** (CRS and measure services) and **Stage 4**
+(processor injected via `get_processor`, file information and measurements endpoints)
+complete; see `docs/sessions/2026-10-07-stage1.md`. Next: **Stage 5**, hardening.
+Stages and exit criteria: `docs/WORKFLOWS.md` §13.
 
 Open questions are tracked in the newest session note, not here.
 

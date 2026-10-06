@@ -8,7 +8,7 @@ import pytest
 from shapely.geometry import Point
 from sqlalchemy import text
 
-from tests.builders import plots, shapefile_parts, survey_kml, without, write_zip
+from tests.builders import ground_square, plots, shapefile_parts, survey_kml, without, write_zip
 
 ITEM_KEYS = {
     "index", "layer", "geometry_type", "source_crs", "measurement_method", "measurement_crs",
@@ -159,3 +159,20 @@ def test_null_properties_round_trip_as_json_nulls(e2e_client, tmp_path):
         ).all()
     assert len(stored) == 2
     assert all(valid == 1 for _, valid in stored), stored
+
+
+def test_shapefile_end_to_end(e2e_client, tmp_path):
+    # A Geod.fwd square near Jaipur, written in UTM 43N: measured in place, no transform.
+    square = gpd.GeoDataFrame({"plot": ["A-12"]}, geometry=[ground_square(75.79, 26.91)], crs="EPSG:4326")
+    content = write_zip(tmp_path / "x.zip", shapefile_parts(square.to_crs("EPSG:32643"))).read_bytes()
+    file_id = upload(e2e_client, "parcels.zip", content)
+
+    detail = e2e_client.get(f"/api/files/{file_id}/").json()
+    assert (detail["status"], detail["format"], detail["crs"], detail["feature_count"]) == (
+        "COMPLETED", "SHAPEFILE", "EPSG:32643", 1,
+    )
+    (item,) = measurements(e2e_client, file_id).json()["results"]
+    assert item["layer"] == "parcels"
+    assert item["source_crs"] == item["measurement_crs"] == "EPSG:32643"
+    assert item["measurement"]["value"] == pytest.approx(1_000_000, rel=0.005)
+    assert item["properties"] == {"plot": "A-12"}
