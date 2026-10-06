@@ -93,8 +93,14 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - Upload KML returns 202, then the file reaches `COMPLETED` with the correct
   `feature_count`.
 - Upload Shapefile zip, same check.
-- Wrong extension returns 415; oversize returns 413, both from a large declared
-  `Content-Length` and from a body that crosses the limit while being copied.
+- Wrong extension returns 415; oversize returns 413 and saves nothing. Cover each layer
+  separately: a declared `Content-Length` (tested on the middleware alone, with a
+  `receive` that fails if called), a chunked body with no `Content-Length`, and a file
+  just over the limit but inside the multipart allowance. Middleware tests use an
+  unsupported extension so that a 413 cannot come from the route instead (the route
+  would answer 415).
+- Client paths in the filename are reduced to the base name. Test relative and POSIX
+  paths; python-multipart already strips drive-letter paths before the route sees them.
 - Slashless paths are served directly, with no 307 redirect.
 - Unknown id returns 404 on both GET endpoints.
 - Measurements before completion return 409; for a `FAILED` file the 409 detail carries

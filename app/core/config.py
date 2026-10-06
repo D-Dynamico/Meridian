@@ -42,6 +42,13 @@ class Settings:
     def max_upload_mb(self) -> int:
         return self.max_upload_bytes // (1024 * 1024)
 
+    @property
+    def max_upload_label(self) -> str:
+        """Human-readable limit for error messages, such as "50 MB"."""
+        if self.max_upload_bytes % (1024 * 1024) == 0:
+            return f"{self.max_upload_mb} MB"
+        return f"{self.max_upload_bytes} bytes"
+
 
 def load_settings() -> Settings:
     """Build settings from the environment, falling back to the defaults."""

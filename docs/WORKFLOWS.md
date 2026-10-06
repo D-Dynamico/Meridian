@@ -47,8 +47,9 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 
 **Stage 1: Skeleton and upload**
 - Project layout from `ARCHITECTURE.md` §3, config, database models, session dependency.
-- Upload route with extension and size checks (`Content-Length` first, then counted while
-  copying), `File` row created as `PENDING`. The route schedules no background task yet,
+- Upload route with extension and exact file-size checks, behind a size middleware that
+  rejects oversized bodies before FastAPI reads them (`DECISIONS.md` D24). `File` row
+  created as `PENDING`. The route schedules no background task yet,
   because there is no processor until Stage 4. Files stay `PENDING` until then.
 - Health and list endpoints, with hidden slashless aliases (`DECISIONS.md` D18).
 - Exit: app starts, `/docs` loads, uploading a KML returns 202 and creates a row; tests for

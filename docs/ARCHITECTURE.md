@@ -55,6 +55,8 @@ app/
   main.py              App factory create_app(settings), router registration, startup
                        (create folders and tables), health check
   api/files.py         Routes only. No GeoPandas, Shapely or pyproj imports
+  api/upload_limit.py  ASGI middleware enforcing the request-body size limit before
+                       FastAPI reads the body
   api/deps.py          Request-scoped dependencies: settings and database session, read
                        from app.state so each test can build its own app
   core/config.py       Upload size limit, allowed extensions, storage paths
@@ -124,12 +126,17 @@ Summary figures (counts by type, total area, total length) are computed on read,
 
 ## §5 File-processing flow
 
-1. The upload route checks the extension (case-insensitive) and size, writes the file to a
-   temp folder, creates a `File` row with status `PENDING`, schedules the background task,
-   and returns 202 with the id. Starlette has already buffered the body by the time the
-   handler runs, so the size check happens twice: a declared `Content-Length` over the
-   limit is rejected before reading, and the copy to disk counts bytes and deletes the
-   partial file if the limit is crossed.
+1. The upload is accepted in two layers:
+   - **Size middleware** (`api/upload_limit.py`). FastAPI reads and parses the whole
+     multipart body before it runs any dependency or the handler, so a check inside the
+     route cannot stop an oversized upload from being received. The middleware sits in
+     front: a declared `Content-Length` over the body limit gets 413 before any byte is
+     read, and otherwise it counts bytes as they arrive and raises 413 once past the
+     limit. The body limit is the file limit plus 64 KB for multipart framing.
+   - **Upload route.** Checks the extension (case-insensitive) and the exact file size,
+     keeps only the base name of the client's filename, writes the file to
+     `data/uploads/<id><ext>` (never a client-controlled path), creates a `File` row with
+     status `PENDING`, schedules the background task, and returns 202 with the id.
 2. The background task sets status `PROCESSING` and calls the loader.
 3. The loader:
    - for a zip, verifies it is a real zip, rejects any entry path that escapes the extraction

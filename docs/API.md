@@ -169,15 +169,19 @@ All errors use FastAPI's standard shape: `{ "detail": "<human-readable reason>" 
 
 | Case | Code | Example detail |
 |---|---|---|
-| Unsupported extension | 415 | Only .zip and .kml files are supported |
+| Unsupported extension | 415 | Only .kml and .zip files are supported |
 | File too large | 413 | Maximum upload size is 50 MB |
+| Missing `file` form field | 422 | FastAPI's standard validation error |
 | Unknown file id | 404 | File not found |
 | Measurements before completion | 409 | File is still PROCESSING |
 | Measurements for a failed file | 409 | File processing FAILED: Shapefile zip is missing .dbf |
 
-The 413 check runs twice. A declared `Content-Length` over the limit is rejected before
-the body is read. The copy to disk also counts bytes, so a missing or false header cannot
-get past the limit, and a partial file is deleted.
+The 413 comes from one of two layers (`ARCHITECTURE.md` §5 step 1). Middleware rejects a
+request body over the limit before FastAPI reads it: at once when `Content-Length`
+declares it, otherwise as soon as the counted bytes pass the limit. The route then checks
+the exact file size. Either way, nothing is saved. An oversized upload with an unsupported
+extension gets 413, not 415, because the middleware answers before the route checks the
+extension.
 
 File-level processing problems (corrupt zip, missing parts) do not fail the upload request.
 They surface as `status: FAILED` with `error` set on the file information endpoint.

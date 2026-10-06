@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api import files
+from app.api.upload_limit import UploadSizeLimitMiddleware
 from app.core.config import Settings, load_settings
 from app.db.session import init_db, make_engine
 
@@ -33,6 +35,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.engine = engine
+    app.add_middleware(
+        UploadSizeLimitMiddleware,
+        max_body_bytes=settings.max_body_bytes,
+        limit_label=settings.max_upload_label,
+    )
+    app.include_router(files.router)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:
