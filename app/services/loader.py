@@ -25,6 +25,7 @@ from pyogrio.errors import DataLayerError, DataSourceError
 from pyproj import CRS
 from shapely.geometry.base import BaseGeometry
 
+from app.core.config import size_label
 from app.services.properties import json_safe_properties
 
 REQUIRED_SHAPEFILE_PARTS = (".shp", ".shx", ".dbf")
@@ -106,7 +107,7 @@ def _load_kml(path: Path) -> LoadedFile:
             for name in layer_names
         ]
     except (DataSourceError, DataLayerError) as exc:
-        raise LoaderError(f"The KML file could not be read: {_scrub(exc, path, 'the file')}") from exc
+        raise LoaderError(f"The KML file could not be read: {_kml_detail(exc, path)}") from exc
     # A document with no placemarks has no layers at all. That is a valid, empty file.
     return LoadedFile(layers)
 
@@ -141,9 +142,7 @@ def _load_shapefile_zip(path: Path, work_dir: Path, max_extracted_bytes: int) ->
         # size fails its CRC check on read, which surfaces as a corrupt zip below.
         declared = sum(info.file_size for parts in groups.values() for info in parts.values())
         if declared > max_extracted_bytes:
-            raise LoaderError(
-                f"The zip expands to more than {max_extracted_bytes // (1024 * 1024)} MB"
-            )
+            raise LoaderError(f"The zip expands to more than {size_label(max_extracted_bytes)}")
 
         work_dir.mkdir(parents=True, exist_ok=True)
         extract_root = Path(tempfile.mkdtemp(dir=work_dir))
@@ -176,7 +175,9 @@ def _safe_members(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
         name = info.filename.replace("\\", "/")
         parts = PurePosixPath(name).parts
         if name.startswith("/") or ".." in parts or (parts and ":" in parts[0]):
-            raise LoaderError(f"The zip contains an unsafe path: {info.filename}")
+            raise LoaderError(
+                f"The zip contains an unsafe path that points outside the archive: {info.filename}"
+            )
         if info.is_dir() or _is_os_metadata(parts):
             continue
         members.append(info)
@@ -247,8 +248,19 @@ def _read_shapefile(shp_path: Path, name: str) -> gpd.GeoDataFrame:
 
 
 def _scrub(exc: Exception, path: Path, shown: str) -> str:
-    """GDAL errors quote the full server path. Replace it with a name the user knows."""
-    message = str(exc)
+    """Make a GDAL error fit for users: replace the server path, which GDAL quotes in
+    full, with a name the user knows, and drop GDAL's tip about driver prefixes, which
+    is about GDAL's own command line and means nothing to an API caller."""
+    message = str(exc).split("; It might help to specify the correct driver")[0]
     for form in (str(path), path.as_posix()):
         message = message.replace(form, shown)
+    return message.rstrip(".; ")
+
+
+def _kml_detail(exc: Exception, path: Path) -> str:
+    """LIBKML reports "ERROR parsing kml <path> :<detail>". Keep only the detail."""
+    message = _scrub(exc, path, "")
+    marker = "ERROR parsing kml"
+    if message.startswith(marker) and ":" in message:
+        return message.split(":", 1)[1].strip()
     return message

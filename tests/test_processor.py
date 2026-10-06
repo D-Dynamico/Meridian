@@ -170,7 +170,7 @@ def test_one_feature_that_raises_is_recorded_and_the_rest_complete(engine, setti
     assert file.status == FileStatus.COMPLETED
     assert file.feature_count == 3
     assert features[1].value is None
-    assert features[1].note == "Measurement failed: RuntimeError: boom"
+    assert features[1].note == "Measurement failed because of an unexpected server error"
     assert features[0].value is not None  # before the failure
     assert features[2].note == "No measurement for point geometries"  # after it
 

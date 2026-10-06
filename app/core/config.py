@@ -18,6 +18,13 @@ MULTIPART_ALLOWANCE_BYTES = 64 * 1024
 FORMAT_BY_EXTENSION = {".zip": "SHAPEFILE", ".kml": "KML"}
 
 
+def size_label(size_bytes: int) -> str:
+    """Human-readable size for messages: "50 MB" when it is whole megabytes, else bytes."""
+    if size_bytes % (1024 * 1024) == 0:
+        return f"{size_bytes // (1024 * 1024)} MB"
+    return f"{size_bytes} bytes"
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = Path("data")
@@ -58,9 +65,7 @@ class Settings:
     @property
     def max_upload_label(self) -> str:
         """Human-readable limit for error messages, such as "50 MB"."""
-        if self.max_upload_bytes % (1024 * 1024) == 0:
-            return f"{self.max_upload_mb} MB"
-        return f"{self.max_upload_bytes} bytes"
+        return size_label(self.max_upload_bytes)
 
 
 def load_settings() -> Settings:

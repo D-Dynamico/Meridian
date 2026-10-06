@@ -204,7 +204,27 @@ extension gets 413, not 415, because the middleware answers before the route che
 extension.
 
 File-level processing problems (corrupt zip, missing parts) do not fail the upload request.
-They surface as `status: FAILED` with `error` set on the file information endpoint.
+They surface as `status: FAILED` with `error` set on the file information endpoint, and in
+the 409 from the measurements endpoint. The messages, exactly as returned:
+
+| Problem | `error` |
+|---|---|
+| Not a zip archive | The file is not a valid zip archive |
+| Entry fails its checksum | The zip is corrupt: Bad CRC-32 for file 'parcels.prj' |
+| Password-protected zip | Password-protected zips are not supported |
+| Entry path escapes the folder | The zip contains an unsafe path that points outside the archive: ../evil.shp |
+| Expands past the limit | The zip expands to more than 500 MB |
+| No `.shp` in the zip | The zip contains no shapefile (.shp) |
+| Missing parts | Shapefile 'parcels' is missing .shx and .dbf |
+| GDAL cannot read a shapefile | Shapefile 'parcels' could not be read: 'parcels.shp' not recognized as being in a supported file format |
+| Malformed KML | The KML file could not be read: syntax error on line 1 at offset 0 |
+| Server restarted mid-processing | Processing was interrupted by a server restart; please upload the file again |
+| Any other server-side failure | Processing failed because of an unexpected server error |
+
+Messages never contain server paths, and an unexpected error never exposes exception
+details; those go to the server log. The same policy applies to a single feature: a bug
+while measuring one feature leaves the note "Measurement failed because of an unexpected
+server error" and the rest of the file is processed normally.
 
 ## §8.6 List files
 

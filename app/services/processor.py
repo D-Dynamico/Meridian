@@ -28,7 +28,9 @@ from app.services.measure import Measurement, measure
 logger = logging.getLogger(__name__)
 
 MIXED_CRS = "MIXED"
-INTERRUPTED = "Processing was interrupted by a server restart. Please upload the file again."
+INTERRUPTED = "Processing was interrupted by a server restart; please upload the file again"
+UNEXPECTED = "Processing failed because of an unexpected server error"
+FEATURE_FAILED = "Measurement failed because of an unexpected server error"
 
 
 def process_file(file_id: uuid.UUID, *, engine: Engine, settings: Settings) -> None:
@@ -57,7 +59,7 @@ def process_file(file_id: uuid.UUID, *, engine: Engine, settings: Settings) -> N
             logger.exception("Unexpected error while processing file %s", file_id)
             session.rollback()
             file.status = FileStatus.FAILED
-            file.error = "Processing failed because of an unexpected server error."
+            file.error = UNEXPECTED
         finally:
             path.unlink(missing_ok=True)
 
@@ -102,10 +104,12 @@ def _feature_row(file_id, index, layer_name, source_label, feature, layer_crs) -
     try:
         row.geometry = None if feature.geometry is None else shapely.to_geojson(feature.geometry)
         _apply(row, measure(feature.geometry, layer_crs.crs, layer_crs.assumed))
-    except Exception as exc:
+    except Exception:
+        # measure() never raises for bad input, so this is a bug. Details go to the log,
+        # not to the user, the same policy as for file-level errors.
         logger.exception("Feature %s of file %s could not be measured", index, file_id)
         row.measurement_type = MeasurementType.NONE
-        row.note = f"Measurement failed: {type(exc).__name__}: {exc}"
+        row.note = FEATURE_FAILED
     return row
 
 

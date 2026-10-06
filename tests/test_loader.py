@@ -98,8 +98,10 @@ def test_kml_with_no_placemarks_has_no_layers(tmp_path, work_dir):
 
 
 def test_malformed_kml_fails_without_leaking_server_paths(tmp_path, work_dir):
-    with pytest.raises(LoaderError, match="The KML file could not be read") as caught:
+    with pytest.raises(LoaderError) as caught:
         load_kml(tmp_path, work_dir, "this is not xml")
+    # Only GDAL's own detail is kept, not its "ERROR parsing kml <path> :" prefix.
+    assert str(caught.value) == "The KML file could not be read: syntax error on line 1 at offset 0"
     assert str(tmp_path) not in str(caught.value)
     assert tmp_path.as_posix() not in str(caught.value)
 
@@ -208,15 +210,19 @@ def test_password_protected_zip_fails_with_a_clear_message(tmp_path, work_dir):
 def test_unreadable_shapefile_fails_with_its_name(tmp_path, work_dir):
     parts = shapefile_parts(plots())
     parts["parcels.shp"] = b"\x00" * 100
-    with pytest.raises(LoaderError, match="Shapefile 'parcels' could not be read") as caught:
+    with pytest.raises(LoaderError) as caught:
         load_zip(tmp_path, work_dir, parts)
+    assert str(caught.value) == (
+        "Shapefile 'parcels' could not be read: "
+        "'parcels.shp' not recognized as being in a supported file format"
+    )
     assert str(tmp_path) not in str(caught.value)
 
 
 def test_zip_that_expands_past_the_limit_is_refused(tmp_path, work_dir):
     parts = shapefile_parts(plots())
     total = sum(len(data) for data in parts.values())
-    with pytest.raises(LoaderError, match="expands to more than"):
+    with pytest.raises(LoaderError, match=rf"^The zip expands to more than {total - 1} bytes$"):
         load_zip(tmp_path, work_dir, parts, max_extracted=total - 1)
 
 
