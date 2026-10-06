@@ -9,18 +9,33 @@ the submission stand out. The suite runs fully offline. Stable section numbers, 
 Prefer fixtures generated in test setup with GeoPandas over committed binary files, so every
 expected value is known and the repo stays small. Commit only what cannot be generated easily.
 
+**Accuracy fixtures are built with `pyproj.Geod.fwd`**, which walks true ground distances on
+the WGS84 ellipsoid and returns lon/lat. Never build them as a square in UTM coordinates:
+measured back in the same zone, it always comes out at exactly 1,000,000 m2, so the test
+passes whether or not the CRS handling is right (`CRS.md` §9.5).
+
 | Fixture | Expected |
 |---|---|
-| 1 km by 1 km square near Jaipur in EPSG:4326 | Area about 1,000,000 m2 |
-| Straight 1 km line running due north | Length about 1,000 m |
+| 1 km by 1 km square near Jaipur in EPSG:4326, built with `Geod.fwd` | Area about 1,000,000 m2; projected against geodesic gap about -0.064% |
+| Same square near Bengaluru | Gap about +0.116%, inside the 0.25% tolerance |
+| Same square at a zone edge on the equator | Gap about +0.195%, the worst case inside a zone |
+| Straight 1 km line running due north, built with `Geod.fwd` | Length about 1,000 m |
 | Square already in EPSG:32643 | Measured with no transform |
+| Square in EPSG:3857 | Transformed to UTM, not measured in place |
+| Clockwise polygon (Shapefile ring order) | Positive geodesic area |
 | KML with two folders: one polygon layer, one line-and-point layer | Features from both layers, layer names kept |
+| KML feature whose Z values are all 0 | No "Z ignored" note |
 | Shapefile zip with `.prj` | CRS read correctly |
-| Shapefile zip without `.prj` | `crs_assumed: true` |
+| Shapefile zip without `.prj` | `crs` is `EPSG:4326`, `crs_assumed: true` |
+| Zip with two shapefiles in different CRSs | Per-feature `source_crs`, file `crs` is `MIXED` |
+| Zip made on macOS (`__MACOSX/._parcels.shp` entries) | Metadata ignored, real shapefile read |
+| Zip with upper-case extensions (`.SHP`, `.DBF`) | Read normally |
 | Zip missing `.dbf` | File `FAILED`, reason names `.dbf` |
 | Self-intersecting "bowtie" polygon | Repaired, positive area, `repaired: true` |
+| Degenerate sliver polygon (zero area) | `make_valid` returns lines; null measurement, note "degenerate polygon" |
 | Feature with a GeometryCollection | Null measurement, note, no exception |
 | Empty geometry | Null measurement, note |
+| Polygon beyond 84°N | Geodesic value, null `measurement_crs`, note |
 | Corrupt zip (random bytes) | File `FAILED` |
 | Zip with an entry path containing `../` | Rejected, nothing written outside the temp folder |
 | Polygon in the southern hemisphere | Uses an EPSG 327xx zone |
@@ -29,8 +44,13 @@ expected value is known and the repo stays small. Commit only what cannot be gen
 
 **services/crs**
 - Bengaluru centroid selects EPSG:32643.
-- A southern-hemisphere centroid selects a 327xx code.
-- Projected-in-metres input returns its own CRS and skips transforming.
+- A southern-hemisphere centroid selects a 327xx code. **Assert the code, not the area:**
+  the same square at 56°N and 56°S measures identically, so an area check cannot see a
+  hemisphere bug (`CRS.md` §9.3).
+- UTM input returns its own CRS and skips transforming.
+- EPSG:3857 input is sent to a UTM zone, not measured in place.
+- Longitude 180 selects zone 60, not 61.
+- Latitude beyond 84°N or 80°S returns no zone.
 - Transformer cache returns the same object for the same EPSG code.
 - Missing CRS with valid lon/lat ranges infers EPSG:4326 and flags it; out-of-range
   coordinates skip measurement.
@@ -38,35 +58,48 @@ expected value is known and the repo stays small. Commit only what cannot be gen
 **services/measure**
 - Square area within 0.5 percent of 1,000,000 m2.
 - Line length within 0.5 percent of 1,000 m.
-- Projected and geodesic values agree within 0.1 percent for both.
+- Projected and geodesic values agree within 0.25 percent for area and 0.15 percent for
+  length, at Jaipur, Bengaluru and the equatorial zone edge.
+- Geodesic area of a clockwise polygon is positive.
+- Geodesic value for a projected source is computed after transforming to lon/lat (compare
+  it with the geodesic value of the same feature given in EPSG:4326).
 - MultiPolygon area equals the sum of its parts.
 - Point returns null with a note.
 - GeometryCollection and empty geometry return null with a note and never raise.
-- Bowtie polygon is repaired and flagged.
-- Z coordinates are ignored with a note.
+- Bowtie polygon is repaired, only polygon parts are measured, and it is flagged.
+- Degenerate sliver returns null with note "degenerate polygon", never a length.
+- Beyond 84°N returns the geodesic value with a note and null `measurement_crs`.
+- Non-zero Z is ignored with a note; all-zero Z adds no note.
+- Several notes on one feature are joined with `"; "` in the fixed order.
 
 **services/loader**
 - Multi-layer KML returns every layer.
 - Missing required shapefile parts are named in the error.
 - Zip-slip entries are rejected.
 - Corrupt zip fails cleanly.
+- macOS metadata entries are ignored; upper-case extensions are accepted.
+- Shapefiles with different CRSs keep their own CRS per layer.
 - Temp folder is removed after success and after failure.
 
 **services/processor**
 - A single feature that raises is recorded with a note and the rest still complete.
 - Status moves `PENDING` to `PROCESSING` to `COMPLETED`.
 - File-level failure sets `FAILED` with an error message.
+- Files left `PENDING` or `PROCESSING` are marked `FAILED` by the startup recovery.
 
 **api**
 - Upload KML returns 202, then the file reaches `COMPLETED` with the correct
   `feature_count`.
 - Upload Shapefile zip, same check.
-- Wrong extension returns 415; oversize returns 413.
+- Wrong extension returns 415; oversize returns 413, both from a large declared
+  `Content-Length` and from a body that crosses the limit while being copied.
+- Slashless paths are served directly, with no 307 redirect.
 - Unknown id returns 404 on both GET endpoints.
 - Measurements before completion return 409.
 - `geometry_type` filter returns only matching features.
 - `include_geometry=false` omits geometry.
 - Pagination returns the right slice and total count.
+- Every result carries every field, with null where there is no value.
 
 **architecture guard**
 - Importing `app.api.files` does not import GeoPandas, Shapely or pyproj. Check this in a
@@ -84,9 +117,13 @@ a test is missing.
 | Skip the CRS transform and measure in source coordinates | Square area test |
 | Swap lon and lat (drop `always_xy`) | Zone selection test or area tolerance test |
 | Always use zone 43 regardless of location | Southern-hemisphere test |
+| Always use the northern hemisphere (326xx) | Southern-hemisphere EPSG code assertion (an area assertion would stay green) |
 | Read only the first KML layer | Multi-layer KML test |
 | Remove the per-feature error boundary | Processor single-failure test |
 | Remove `make_valid` | Bowtie test |
+| Measure whatever `make_valid` returns, including lines | Degenerate sliver test |
+| Drop `abs()` on the geodesic area | Clockwise polygon test |
+| Trust any projected CRS in metres | EPSG:3857 test |
 | Drop the zip-slip check | Zip-slip test |
 | Silently assume 4326 without setting the flag | Missing `.prj` test |
 | Return geodesic value equal to projected value | Cross-check agreement is not enough here; add a test that the geodesic path runs on unprojected input |

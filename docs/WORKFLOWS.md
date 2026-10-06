@@ -34,6 +34,8 @@ Rules:
 - A file is `COMPLETED` even if some features have null measurements. Unmeasurable is not
   failure.
 - `FAILED` always carries a human-readable `error`.
+- On startup, files left `PENDING` or `PROCESSING` by a previous process are marked
+  `FAILED` with a restart message (`ARCHITECTURE.md` §5 step 8, `DECISIONS.md` D17).
 - Tests run the processor synchronously rather than racing the background task.
 
 ## §13 Build stages and exit criteria
@@ -45,8 +47,10 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 
 **Stage 1: Skeleton and upload**
 - Project layout from `ARCHITECTURE.md` §3, config, database models, session dependency.
-- Upload route with extension and size checks, `File` row created as `PENDING`.
-- Health and list endpoints.
+- Upload route with extension and size checks (`Content-Length` first, then counted while
+  copying), `File` row created as `PENDING`. The route schedules no background task yet,
+  because there is no processor until Stage 4. Files stay `PENDING` until then.
+- Health and list endpoints, with hidden slashless aliases (`DECISIONS.md` D18).
 - Exit: app starts, `/docs` loads, uploading a KML returns 202 and creates a row; tests for
   upload validation pass.
 
@@ -59,13 +63,16 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 **Stage 3: CRS and measurement**
 - CRS service: source detection, projected-in-metres shortcut, UTM selection, transformer
   cache, missing-`.prj` rule.
-- Measure service: area, length, points, unsupported types, empty geometry, `make_valid`,
-  Z handling, geodesic cross-check.
-- Exit: the 1 km square and 1 km line fixtures measure within tolerance; projected and
-  geodesic agree within 0.1 percent; every §16 measure and CRS test passes.
+- Measure service: area, length, points, unsupported types, empty geometry, `make_valid`
+  with polygon-part extraction, Z handling, geodesic cross-check with `abs()`, geodesic
+  fallback beyond UTM limits.
+- Exit: the `Geod.fwd`-built 1 km square and 1 km line fixtures measure within tolerance;
+  projected and geodesic agree within 0.25 percent for area and 0.15 percent for length
+  (`CRS.md` §9.5); every §16 measure and CRS test passes.
 
 **Stage 4: Processor and read endpoints**
-- Background processing, per-feature error boundary, status transitions, temp cleanup.
+- Background processing, per-feature error boundary, status transitions, temp cleanup,
+  startup recovery of interrupted files.
 - File information endpoint with summary, measurements endpoint with pagination, filter and
   `include_geometry`.
 - Exit: end-to-end API tests pass for KML and Shapefile; failed files report a reason;

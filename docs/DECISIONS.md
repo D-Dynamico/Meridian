@@ -17,11 +17,16 @@ update the row and explain the change in the session note; do not delete the his
 | D7 | File reading | GeoPandas over pyogrio | Fiona; raw GDAL/OGR; a KML-specific parser | pyogrio is faster and ships GDAL inside its wheel, avoiding system installs. GeoPandas gives one API for both formats. |
 | D8 | Identifiers | UUID | Auto-increment integer | Not guessable, safe to expose in URLs. |
 | D9 | Invalid geometry | Repair with `make_valid` and flag it | Reject the feature | Field data is often slightly invalid. Repairing keeps results useful; the flag keeps them honest. |
-| D10 | Missing `.prj` | Infer EPSG:4326 only when coordinates fit, and flag it | Reject the file; always assume 4326 | Rejecting loses usable data. Silent assumption hides risk. Inferring with a visible flag is the honest middle. |
+| D10 | Missing `.prj` | Infer EPSG:4326 only when coordinates fit, store `EPSG:4326` as the CRS, and flag it with `crs_assumed` | Reject the file; always assume 4326; infer but store `crs` as null | Rejecting loses usable data. Silent assumption hides risk. Inferring with a visible flag is the honest middle. Revised in the 2026-10-07 review: the first version stored null, which broke the brief's "every feature reports its CRS". The flag, not a null, is what carries the warning. |
 | D11 | Units | m2 and m canonical, hectares and km as extra fields | Metres only | Hectares are how land parcels are discussed in India; metric base units stay unambiguous for machines. |
-| D12 | Layer handling | Read every layer, keep the layer name per feature | Read only the default layer | GeoPandas reads one layer by default, which silently drops data from multi-folder KML files. |
+| D12 | Layer handling | Read every layer, keep the layer name per feature | Read only the default layer | GeoPandas reads one layer by default and drops the other folders of a multi-folder KML. pyogrio does warn, but a warning in a background task's log is easy to miss and nothing in the response would show the loss. |
 | D13 | Code layout | Thin routes, logic in three services | Logic inside route handlers | Services are unit-testable without HTTP, and interview changes (add perimeter, add GeoJSON) touch one module. |
 | D14 | Async handlers | Plain `def` for anything touching geospatial libraries | `async def` everywhere | GeoPandas and pyproj are CPU-bound and blocking. Plain `def` runs in FastAPI's threadpool and keeps the event loop free. |
+| D15 | Measuring in the source CRS | Only when the source is UTM | Any projected CRS in metres | "Projected and in metres" lets Web Mercator through, which overstates area by 22.3 percent at 25°N. UTM is the one family whose distortion is known and bounded, so every other CRS is sent to UTM. |
+| D16 | Multiple notes per feature | One `note` string, parts joined with `"; "` in a fixed order | A list of notes; only the most important note | Keeps the response flat and readable. A feature can be CRS-assumed, repaired and Z-stripped at once, and dropping any of those would hide an assumption. |
+| D17 | Files interrupted by a restart | Mark `PENDING` and `PROCESSING` files `FAILED` on startup | Leave them; re-run them on startup | `BackgroundTasks` dies with the process, so those files would report `PROCESSING` forever. Re-running would need the upload to outlive its temp folder. A durable queue (Celery) is the real fix and is in future scope. |
+| D18 | Trailing slashes | Canonical paths with a slash, as in the brief, plus hidden slashless aliases | Redirect only; slashless only | Matches the brief exactly. The aliases avoid a 307 round trip and any reliance on a client re-sending a multipart body after a redirect. |
+| D19 | Feature position column | `feature_index` in the database, `index` in the API | `index` everywhere | Readability: `index` is easy to confuse with a DataFrame index in the processor. SQLModel would quote `index` correctly, so this is not a correctness fix. |
 
 ## Open decisions
 
@@ -29,4 +34,11 @@ Record new ones here until they are settled, then move them into the table with 
 
 - Upload size limit: 50 MB proposed. Confirm once real sample files are tested.
 - Whether `GET /api/files/{id}/measurements/` should return partial results while
-  `PROCESSING` instead of 409.
+  `PROCESSING` instead of 409. Recommendation: keep 409. The processor writes all
+  `Feature` rows at the end (§5), so there are no partial results to return.
+- KML system fields in `properties`. GDAL's LIBKML driver adds about 11 mostly-null
+  columns to every KML feature (`altitudeMode`, `tessellate`, `extrude`, `visibility`,
+  `drawOrder`, `icon`, `begin`, `end` and similar). Options: keep them all; drop them only
+  where null for that feature; drop them always. Leaning towards dropping a known list
+  only where null, which removes the noise but keeps a real value such as an explicit
+  `altitudeMode`. Decide in Stage 2 with real KML output in front of us.

@@ -16,6 +16,12 @@ responses once the endpoints exist.
 
 Interactive docs are served at `/docs` by FastAPI.
 
+The trailing-slash paths above are canonical because the brief uses them. The same routes
+are also registered without the trailing slash and hidden from the schema
+(`include_in_schema=False`). Without them, FastAPI answers a slashless request with a 307
+redirect. httpx and requests follow it and resend the body, but serving the request
+directly removes a round trip and any dependence on how a given client handles redirects.
+
 ## §8.2 Upload
 
 `POST /api/files/` with multipart form field `file`.
@@ -64,6 +70,10 @@ Response 200:
 The fields shown in the brief's example (`id`, `filename`, `feature_count`, `crs`, `status`) must
 always be present. `summary` is null until the file is `COMPLETED`.
 
+`crs` is `MIXED` when a zip holds shapefiles with different CRSs; each measurement then
+carries its own `source_crs`. When `crs_assumed` is true, `crs` holds the assumed value
+(`EPSG:4326`), not null.
+
 ## §8.4 Measurements
 
 `GET /api/files/{id}/measurements/`
@@ -108,20 +118,36 @@ Response 200:
       "index": 1,
       "layer": "Roads",
       "geometry_type": "LineString",
+      "source_crs": "EPSG:4326",
+      "measurement_crs": "EPSG:32643",
       "measurement": { "type": "length", "value": 1530.4, "unit": "m", "km": 1.53 },
       "geodesic_value": 1530.1,
-      "note": null
+      "repaired": false,
+      "note": null,
+      "properties": { "name": "Access road" },
+      "geometry": { "type": "LineString", "coordinates": [] }
     },
     {
       "index": 2,
       "layer": "Roads",
       "geometry_type": "Point",
+      "source_crs": "EPSG:4326",
+      "measurement_crs": null,
       "measurement": null,
-      "note": "No measurement for point geometries"
+      "geodesic_value": null,
+      "repaired": false,
+      "note": "No measurement for point geometries",
+      "properties": { "name": "Gate" },
+      "geometry": { "type": "Point", "coordinates": [75.81, 26.91] }
     }
   ]
 }
 ```
+
+Every result carries every field, using null where there is no value, so clients never have
+to check whether a key exists. The one exception is `geometry`, which is left out entirely
+when `include_geometry=false`. `note` may hold several notes joined with `"; "`, for example
+`"CRS assumed EPSG:4326 (no .prj); repaired invalid geometry"`.
 
 ## §8.5 Errors
 
@@ -134,6 +160,10 @@ All errors use FastAPI's standard shape: `{ "detail": "<human-readable reason>" 
 | Unknown file id | 404 | File not found |
 | Measurements before completion | 409 | File is still PROCESSING |
 | Measurements for a failed file | 409 | File processing FAILED: Shapefile zip is missing .dbf |
+
+The 413 check runs twice. A declared `Content-Length` over the limit is rejected before
+the body is read. The copy to disk also counts bytes, so a missing or false header cannot
+get past the limit, and a partial file is deleted.
 
 File-level processing problems (corrupt zip, missing parts) do not fail the upload request.
 They surface as `status: FAILED` with `error` set on the file information endpoint.

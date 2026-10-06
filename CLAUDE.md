@@ -100,8 +100,15 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 - **Be honest about assumptions.** A missing `.prj` is never silently treated as EPSG:4326.
   If the CRS is assumed, the response says `crs_assumed: true`. If a polygon was repaired,
   it says `repaired: true`.
-- **Read every KML layer.** GeoPandas reads only the first layer by default. The loader must
-  list layers and read each one, keeping the layer name on every feature.
+- **Only UTM is measured in place.** Every other CRS, even one projected in metres such as
+  Web Mercator (+22.3% area at 25°N), is transformed to the feature's UTM zone first.
+- **Geodesic area is signed.** `Geod` returns negative area for clockwise rings, and
+  Shapefile exteriors are clockwise. Always take `abs()`, and feed it lon/lat only.
+- **Accuracy fixtures are built on the ground.** Use `Geod.fwd`, never a square drawn in UTM,
+  which measures exactly 1,000,000 m2 whether or not the CRS code works.
+- **Read every KML layer.** GeoPandas reads only the first layer by default and only warns
+  about the rest. The loader must list layers and read each one, keeping the layer name on
+  every feature.
 - **Axis order is always lon, lat.** Every pyproj transformer is built with `always_xy=True`.
   Transformers are cached per EPSG code, not rebuilt per feature.
 - **Blocking work stays off the event loop.** GeoPandas and pyproj are CPU-bound. Handlers
@@ -116,7 +123,8 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 
 ## Status
 
-Stage 0 (planning and docs) complete. No application code yet. Next: **Stage 1**, project
+Stage 0 (planning and docs) complete and reviewed against real pyproj, Shapely and pyogrio
+behaviour (`docs/sessions/2026-10-07-stage1.md`). No application code yet. Next: **Stage 1**, project
 skeleton, data model and upload route. Stages and exit criteria: `docs/WORKFLOWS.md` §13.
 
 Open questions are tracked in the newest session note, not here.
