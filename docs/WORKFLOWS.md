@@ -7,7 +7,7 @@ build is staged. Stable section numbers, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md
 
 Target: a reviewer goes from fresh clone to a working `/docs` page in under five minutes.
 
-- Python 3.11 or newer.
+- Python 3.12 (`DECISIONS.md` D23). The Docker image is `python:3.12-slim`.
 - A virtual environment in `.venv/`. On Windows the interpreter is under `.venv/Scripts/`.
 - All dependencies pinned in `requirements.txt`. pyogrio wheels bundle GDAL, so no system
   GDAL install should be needed. If a platform needs one, document it in the README.

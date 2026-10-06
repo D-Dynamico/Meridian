@@ -28,14 +28,15 @@ update the row and explain the change in the session note; do not delete the his
 | D18 | Trailing slashes | Canonical paths with a slash, as in the brief, plus hidden slashless aliases | Redirect only; slashless only | Matches the brief exactly. The aliases avoid a 307 round trip and any reliance on a client re-sending a multipart body after a redirect. |
 | D19 | Feature position column | `feature_index` in the database, `index` in the API | `index` everywhere | Readability: `index` is easy to confuse with a DataFrame index in the processor. SQLModel would quote `index` correctly, so this is not a correctness fix. |
 
+| D20 | Upload size limit | 50 MB | No limit; 10 MB; 500 MB | Survey parcel and alignment files are usually well under 50 MB, and the limit bounds both disk use and the memory GeoPandas needs to read a file. Configurable in `app/core/config.py`. |
+| D21 | Measurements before completion | 409 for `PENDING`, `PROCESSING` and `FAILED`, with the status (and the failure reason for `FAILED`) in `detail` | Partial results while `PROCESSING`; 200 with an empty list | The processor writes all `Feature` rows at the end (`ARCHITECTURE.md` §5), so there are no partial results to return. An empty 200 would look like a file with no features. |
+| D22 | How a value was computed | Explicit `measurement_method` (`projected` or `geodesic`), with `geodesic_value` always filled on a measured feature | Infer it from `measurement_crs` being null | A consumer should not have to know that a null CRS means "geodesic". The explicit field also leaves room for a future equal-area method. |
+| D23 | Runtime | Python 3.12, `python:3.12-slim` in Docker | Full Debian image with system GDAL; Python 3.13 | pyogrio and pyproj wheels bundle GDAL and PROJ, so the slim image needs no system packages. 3.12 matches the development machine. |
+
 ## Open decisions
 
 Record new ones here until they are settled, then move them into the table with reasoning.
 
-- Upload size limit: 50 MB proposed. Confirm once real sample files are tested.
-- Whether `GET /api/files/{id}/measurements/` should return partial results while
-  `PROCESSING` instead of 409. Recommendation: keep 409. The processor writes all
-  `Feature` rows at the end (§5), so there are no partial results to return.
 - KML system fields in `properties`. GDAL's LIBKML driver adds about 11 mostly-null
   columns to every KML feature (`altitudeMode`, `tessellate`, `extrude`, `visibility`,
   `drawOrder`, `icon`, `begin`, `end` and similar). Options: keep them all; drop them only

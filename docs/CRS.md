@@ -122,7 +122,7 @@ Record the gaps observed on the sample files in the README's learnings section.
 | Projected but not UTM (for example EPSG:3857) | Transformed to UTM, never measured in place (§9.2 step 4). |
 | Feature crosses a UTM zone boundary | Use the centroid's zone. Error stays small for features a few km across. Mention in the README. |
 | Very large feature (district or state scale) | Projected value is less reliable. The geodesic value is the better answer; note this as future work for automatic switching or a local equal-area projection. |
-| Centroid beyond 84°N or 80°S | UTM is undefined there. No projected measurement: `value` is the geodesic value, `measurement_crs` is null, note "outside UTM coverage, geodesic value used". |
+| Centroid beyond 84°N or 80°S | UTM is undefined there. No projected measurement: `value` and `geodesic_value` both hold the geodesic value, `measurement_method` is `geodesic`, `measurement_crs` is null, note "outside UTM coverage, geodesic value used". |
 | Centroid exactly on the equator or a zone edge | Deterministic rule: latitude 0 counts as north; a longitude on a boundary goes to the higher zone; longitude 180 is clamped to zone 60. |
 | Antimeridian-crossing geometry | Out of scope. Note as a known limitation. |
 | Z coordinates | Ignored for measurement. Noted only when some Z value is non-zero, since GDAL's KML reader returns Z = 0 everywhere. |

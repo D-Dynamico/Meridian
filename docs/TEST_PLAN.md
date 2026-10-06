@@ -68,7 +68,9 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - GeometryCollection and empty geometry return null with a note and never raise.
 - Bowtie polygon is repaired, only polygon parts are measured, and it is flagged.
 - Degenerate sliver returns null with note "degenerate polygon", never a length.
-- Beyond 84°N returns the geodesic value with a note and null `measurement_crs`.
+- Beyond 84°N returns the geodesic value with a note, `measurement_method` `geodesic`,
+  `geodesic_value` filled and null `measurement_crs`.
+- Every measured feature has a non-null `measurement_method` and `geodesic_value`.
 - Non-zero Z is ignored with a note; all-zero Z adds no note.
 - Several notes on one feature are joined with `"; "` in the fixed order.
 
@@ -95,7 +97,8 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
   `Content-Length` and from a body that crosses the limit while being copied.
 - Slashless paths are served directly, with no 307 redirect.
 - Unknown id returns 404 on both GET endpoints.
-- Measurements before completion return 409.
+- Measurements before completion return 409; for a `FAILED` file the 409 detail carries
+  the failure reason.
 - `geometry_type` filter returns only matching features.
 - `include_geometry=false` omits geometry.
 - Pagination returns the right slice and total count.

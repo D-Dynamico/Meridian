@@ -101,6 +101,7 @@ Response 200:
       "layer": "Parcels",
       "geometry_type": "Polygon",
       "source_crs": "EPSG:4326",
+      "measurement_method": "projected",
       "measurement_crs": "EPSG:32643",
       "measurement": {
         "type": "area",
@@ -119,6 +120,7 @@ Response 200:
       "layer": "Roads",
       "geometry_type": "LineString",
       "source_crs": "EPSG:4326",
+      "measurement_method": "projected",
       "measurement_crs": "EPSG:32643",
       "measurement": { "type": "length", "value": 1530.4, "unit": "m", "km": 1.53 },
       "geodesic_value": 1530.1,
@@ -132,6 +134,7 @@ Response 200:
       "layer": "Roads",
       "geometry_type": "Point",
       "source_crs": "EPSG:4326",
+      "measurement_method": null,
       "measurement_crs": null,
       "measurement": null,
       "geodesic_value": null,
@@ -148,6 +151,17 @@ Every result carries every field, using null where there is no value, so clients
 to check whether a key exists. The one exception is `geometry`, which is left out entirely
 when `include_geometry=false`. `note` may hold several notes joined with `"; "`, for example
 `"CRS assumed EPSG:4326 (no .prj); repaired invalid geometry"`.
+
+`measurement_method` says how `measurement.value` was computed:
+
+- `projected`: transformed to `measurement_crs` (a UTM zone) and measured there. This is
+  the normal case. `geodesic_value` is the independent cross-check.
+- `geodesic`: computed on the WGS84 ellipsoid, used only where UTM is undefined (beyond
+  84°N or 80°S, `CRS.md` §9.6). `measurement_crs` is null and `geodesic_value` equals
+  `measurement.value`.
+- `null`: there is no measurement.
+
+On a measured feature, `measurement_method` and `geodesic_value` are never null.
 
 ## §8.5 Errors
 

@@ -111,7 +111,8 @@ Two tables. Geometry is stored as GeoJSON text, properties as JSON.
 | measurement_type | `area`, `length` or `none` |
 | value | Projected measurement in m2 or m, or null |
 | unit | `m2`, `m` or null |
-| geodesic_value | Geodesic cross-check in the same unit, or null |
+| measurement_method | `projected` or `geodesic`: how `value` was computed. Null only when there is no measurement. Stated explicitly so consumers never infer it from `measurement_crs` |
+| geodesic_value | Geodesic value in the same unit. Never null on a measured feature: it is the cross-check for `projected`, and equal to `value` for `geodesic` |
 | measurement_crs | Projected CRS used, for example `EPSG:32643`. Null when no projection was used (no measurement, or a geodesic fallback beyond UTM limits) |
 | repaired | True if `make_valid` changed the geometry |
 | note | Why there is no measurement, or what was assumed, repaired or ignored. Several notes are joined with `"; "` in a fixed order |
@@ -160,9 +161,10 @@ Summary figures (counts by type, total area, total length) are computed on read,
    absolute value, because `Geod` returns signed area by ring orientation and Shapefile
    exteriors are clockwise, which comes back negative.
 5. **LineString or MultiLineString:** same path, length in m, geodesic length alongside.
-6. **No UTM zone** (centroid beyond 84°N or 80°S): no projected measurement. `value` is the
-   geodesic value, `measurement_crs` is null, note "outside UTM coverage, geodesic value
-   used" (`CRS.md` §9.6).
+6. **No UTM zone** (centroid beyond 84°N or 80°S): no projected measurement. `value` and
+   `geodesic_value` both hold the geodesic value, `measurement_method` is `geodesic`,
+   `measurement_crs` is null, note "outside UTM coverage, geodesic value used"
+   (`CRS.md` §9.6). Every other measured feature has `measurement_method` `projected`.
 7. **Z values present:** measure in 2D. Note "Z ignored" only when some Z value is
    non-zero, because GDAL's KML reader returns Z = 0 on every vertex and the note would
    otherwise appear on every KML feature.
