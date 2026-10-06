@@ -52,20 +52,23 @@ first.
 
 ```
 app/
-  main.py              App factory create_app(settings), router registration, startup
-                       (create folders and tables), health check
+  main.py              Composition root. App factory create_app(settings), router
+                       registration, startup (create folders and tables), health check,
+                       and from Stage 4 the wiring of the real processor (D28)
   api/files.py         Routes only. No GeoPandas, Shapely or pyproj imports
   api/upload_limit.py  ASGI middleware enforcing the request-body size limit before
                        FastAPI reads the body
-  api/deps.py          Request-scoped dependencies: settings and database session, read
-                       from app.state so each test can build its own app
+  api/deps.py          Request-scoped dependencies: settings, database session and (from
+                       Stage 4) get_processor, read from app.state so each test can build
+                       its own app
   core/config.py       Upload size limit, allowed extensions, storage paths
   db/models.py         SQLModel tables: File, Feature
   db/session.py        Engine creation (SQLite thread and foreign-key settings), tables
   schemas/files.py     Pydantic response models
   services/
     loader.py          Zip validation and safe extraction, KML reading, layer iteration.
-                       Returns layers, each a GeoDataFrame in its own CRS
+                       Returns layers, each with its CRS and plain Python features
+    properties.py      to_json_safe: NaN, numpy and pandas values to plain JSON (D29)
     crs.py             Source CRS detection, UTM selection, transformer cache
     measure.py         Area and length per geometry type, make_valid, notes
     processor.py       Orchestrates loader, crs, measure and database writes
@@ -77,9 +80,12 @@ README.md
 CLAUDE.md
 ```
 
-**Dependency direction:** `api` depends on `schemas` and `db`, and calls `processor` only to
-schedule work. `processor` depends on the three services and `db`. The services depend on
-nothing inside `app/` except `core/config`. Nothing imports `api`.
+**Dependency direction:** `api` depends on `schemas` and `db`. It never imports
+`processor`: the upload route receives the processing function through
+`Depends(get_processor)`, typed as a plain callable taking a file id, and `main.py` (the
+composition root) wires the real one (`DECISIONS.md` D28). `processor` depends on the
+services and `db`. The services depend on nothing inside `app/` except `core/config` and
+each other. Nothing imports `api` except `main.py`.
 
 **Import rule:** geospatial libraries are imported only under `app/services/`. A test
 enforces this (`TEST_PLAN.md` §16).
@@ -152,10 +158,12 @@ Summary figures (counts by type, total area, total length) are computed on read,
      when none is named, and only warns about it). Nested folders become separate, flat
      layers; GDAL names duplicate folders `Plots (#2)` and unnamed ones `Layer2`. LIBKML
      display fields are dropped (`DECISIONS.md` D26);
-   - returns a list of layers, each a GeoDataFrame in its own CRS. A single combined
-     GeoDataFrame is not possible, because it carries one CRS and a zip can hold
-     shapefiles in several. The processor walks the layers in order, which gives each
-     feature its stable index.
+   - returns a list of layers, each with its own CRS and a list of features. A single
+     combined GeoDataFrame is not possible, because it carries one CRS and a zip can hold
+     shapefiles in several. Each feature is plain Python: a shapely geometry and a
+     properties dict already passed through `to_json_safe` (D29), so no NaN, numpy or
+     pandas value reaches the processor or the database. The processor walks the layers
+     in order, which gives each feature its stable index.
 4. The processor records the source CRS and feature count, then loops over features, sending
    each through the measure flow (§6) inside its own error boundary.
 5. All `Feature` rows are written, the file becomes `COMPLETED`, and `completed_at` is set.
@@ -223,6 +231,6 @@ reason for no measurement or the geodesic fallback.
 | Server restart mid-processing | Startup | File marked `FAILED` with a restart message |
 | GeometryCollection | Measure service | Null measurement with note |
 | One feature throws | Processor | Note recorded, loop continues |
-| Dates or NaN in attributes | Serialisation | Converted to strings or null |
+| Dates or NaN in attributes | Loader (`to_json_safe`) | NaN, NaT and infinity become null; numpy scalars become Python values; date objects become ISO strings; shapefile date strings pass through unparsed |
 | Unknown file id | Routes | 404 |
 | Measurements while not completed | Routes | 409 with current status |

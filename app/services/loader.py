@@ -4,6 +4,9 @@ The loader returns layers rather than one combined GeoDataFrame, because a GeoDa
 carries a single CRS and a zip can hold shapefiles in different CRSs. The processor walks
 the layers in order, which gives every feature a stable index across the whole file.
 
+Its output is plain Python: a shapely geometry and a dict of JSON-safe properties per
+feature. No pandas or numpy value leaves this module (docs/DECISIONS.md D29).
+
 Only file-level problems raise LoaderError: a corrupt or unsafe zip, missing shapefile
 parts, an unreadable file. Anything wrong with a single feature is the measure service's
 business, never the loader's.
@@ -14,11 +17,15 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Literal
+from typing import Any, Literal
 
 import geopandas as gpd
 import pyogrio
-from pyogrio.errors import DataSourceError, DataLayerError
+from pyogrio.errors import DataLayerError, DataSourceError
+from pyproj import CRS
+from shapely.geometry.base import BaseGeometry
+
+from app.services.properties import json_safe_properties
 
 REQUIRED_SHAPEFILE_PARTS = (".shp", ".shx", ".dbf")
 
@@ -36,11 +43,17 @@ class LoaderError(Exception):
 
 
 @dataclass(frozen=True)
+class SourceFeature:
+    geometry: BaseGeometry | None  # None when the feature has no geometry at all
+    properties: dict[str, Any]  # JSON-safe: no NaN, no numpy or pandas types
+
+
+@dataclass(frozen=True)
 class SourceLayer:
     name: str
-    # Geometry plus attribute columns, in the layer's own CRS. frame.crs is None when a
-    # shapefile has no .prj; the CRS service decides what that means.
-    frame: gpd.GeoDataFrame
+    # None when a shapefile has no .prj; the CRS service decides what that means.
+    crs: CRS | None
+    features: list[SourceFeature]
 
 
 @dataclass(frozen=True)
@@ -49,7 +62,19 @@ class LoadedFile:
 
     @property
     def feature_count(self) -> int:
-        return sum(len(layer.frame) for layer in self.layers)
+        return sum(len(layer.features) for layer in self.layers)
+
+
+def _to_layer(name: str, frame: gpd.GeoDataFrame) -> SourceLayer:
+    """Convert a GeoDataFrame into plain Python features."""
+    attributes = frame.drop(columns=frame.geometry.name)
+    features = [
+        SourceFeature(geometry, json_safe_properties(record))
+        for geometry, record in zip(
+            frame.geometry.tolist(), attributes.to_dict("records"), strict=True
+        )
+    ]
+    return SourceLayer(name, frame.crs, features)
 
 
 def load(
@@ -77,7 +102,7 @@ def _load_kml(path: Path) -> LoadedFile:
         # reads only the first folder and merely warns about the rest (D12).
         layer_names = [name for name, _ in pyogrio.list_layers(path)]
         layers = [
-            SourceLayer(name, _clean_kml_frame(gpd.read_file(path, layer=name)))
+            _to_layer(name, _clean_kml_frame(gpd.read_file(path, layer=name)))
             for name in layer_names
         ]
     except (DataSourceError, DataLayerError) as exc:
@@ -133,7 +158,7 @@ def _load_shapefile_zip(path: Path, work_dir: Path, max_extracted_bytes: int) ->
                 for extension, info in parts.items():
                     _extract(archive, info, layer_dir / f"layer{extension}")
                 name = _layer_name(zip_path, groups)
-                layers.append(SourceLayer(name, _read_shapefile(layer_dir / "layer.shp", name)))
+                layers.append(_to_layer(name, _read_shapefile(layer_dir / "layer.shp", name)))
             return LoadedFile(layers)
         finally:
             shutil.rmtree(extract_root)

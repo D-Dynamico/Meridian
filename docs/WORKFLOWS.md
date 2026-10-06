@@ -36,7 +36,9 @@ Rules:
 - `FAILED` always carries a human-readable `error`.
 - On startup, files left `PENDING` or `PROCESSING` by a previous process are marked
   `FAILED` with a restart message (`ARCHITECTURE.md` §5 step 8, `DECISIONS.md` D17).
-- Tests run the processor synchronously rather than racing the background task.
+- Tests never race the background task. API tests override `get_processor` with
+  `app.dependency_overrides`: a no-op for upload and status tests, the real processor
+  run synchronously for end-to-end tests (`DECISIONS.md` D28).
 
 ## §13 Build stages and exit criteria
 
@@ -74,6 +76,8 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 **Stage 4: Processor and read endpoints**
 - Background processing, per-feature error boundary, status transitions, temp cleanup,
   startup recovery of interrupted files.
+- The upload route schedules the processor received through `Depends(get_processor)`;
+  `main.py` wires the real one. `app/api/files.py` never imports it (D28).
 - File information endpoint with summary, measurements endpoint with pagination, filter and
   `include_geometry`.
 - Exit: end-to-end API tests pass for KML and Shapefile; failed files report a reason;

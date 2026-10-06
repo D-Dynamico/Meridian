@@ -103,7 +103,21 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 - File-level failure sets `FAILED` with an error message.
 - Files left `PENDING` or `PROCESSING` are marked `FAILED` by the startup recovery.
 
+**services/properties** (Stage 2)
+- Every missing or non-finite form (None, NaN, infinity, `pd.NA`, `pd.NaT`, NaT
+  datetime64) becomes None.
+- numpy scalars become Python values of the matching type, including `numpy.float64` and
+  `numpy.str_`, which subclass `float` and `str` and would otherwise slip through.
+- Dates become ISO strings; shapefile date strings pass through unparsed.
+- A shapefile with a null string, a null number, a date and an int column loads as plain
+  Python and passes `json.dumps(allow_nan=False)`. Plain `json.dumps` would write NaN and
+  pass, so the strict form is required.
+
 **api**
+- API tests override `get_processor` (D28): a no-op for upload and status tests, the real
+  processor run synchronously for end-to-end tests.
+- The same null-string, null-number, date and int shapefile round-trips through the
+  measurements endpoint with 200 and JSON nulls, not NaN.
 - Upload KML returns 202, then the file reaches `COMPLETED` with the correct
   `feature_count`.
 - Upload Shapefile zip, same check.
@@ -148,5 +162,7 @@ a test is missing.
 | Drop `abs()` on the geodesic area | Clockwise polygon test |
 | Trust any projected CRS in metres | EPSG:3857 test |
 | Drop the zip-slip check | Zip-slip test |
+| Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test now; the measurements round-trip test from Stage 4 |
+| Route imports the processor directly | Architecture guard |
 | Silently assume 4326 without setting the flag | Missing `.prj` test |
 | Return geodesic value equal to projected value | Cross-check agreement is not enough here; add a test that the geodesic path runs on unprojected input |

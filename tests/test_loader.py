@@ -41,7 +41,7 @@ def load_zip(tmp_path, work_dir, entries: dict[str, bytes], max_extracted=MAX_EX
 
 
 def layer_summary(loaded):
-    return [(layer.name, len(layer.frame)) for layer in loaded.layers]
+    return [(layer.name, len(layer.features)) for layer in loaded.layers]
 
 
 # KML
@@ -61,16 +61,15 @@ def test_multi_folder_kml_returns_every_layer(tmp_path, work_dir):
 
 def test_kml_layers_are_epsg_4326(tmp_path, work_dir):
     loaded = load_kml(tmp_path, work_dir, TWO_FOLDERS)
-    assert all(layer.frame.crs.to_epsg() == 4326 for layer in loaded.layers)
+    assert all(layer.crs.to_epsg() == 4326 for layer in loaded.layers)
 
 
 def test_kml_keeps_extended_data_and_drops_display_fields(tmp_path, work_dir):
     parcels, roads = load_kml(tmp_path, work_dir, TWO_FOLDERS).layers
 
-    assert list(parcels.frame.columns) == ["Name", "owner", "khasra", "geometry"]
-    assert parcels.frame.loc[0, "owner"] == "Asha"
+    assert parcels.features[0].properties == {"Name": "Plot 12", "owner": "Asha", "khasra": "112"}
     # description, timestamp and the rest are unused in this file, so they are dropped.
-    assert list(roads.frame.columns) == ["Name", "geometry"]
+    assert [f.properties for f in roads.features] == [{"Name": "Access road"}, {"Name": "Gate"}]
 
 
 def test_kml_standard_field_is_kept_when_any_feature_uses_it(tmp_path, work_dir):
@@ -78,8 +77,8 @@ def test_kml_standard_field_is_kept_when_any_feature_uses_it(tmp_path, work_dir)
         "</name>", "</name><description>North plot</description>"
     )
     document = kml(folder("Parcels", described, placemark("Other", kml_polygon())))
-    frame = load_kml(tmp_path, work_dir, document).layers[0].frame
-    assert "description" in frame.columns
+    features = load_kml(tmp_path, work_dir, document).layers[0].features
+    assert [f.properties.get("description") for f in features] == ["North plot", None]
 
 
 def test_nested_kml_folders_become_separate_layers(tmp_path, work_dir):
@@ -111,13 +110,13 @@ def test_malformed_kml_fails_without_leaking_server_paths(tmp_path, work_dir):
 def test_shapefile_crs_is_read_from_the_prj(tmp_path, work_dir):
     loaded = load_zip(tmp_path, work_dir, shapefile_parts(plots(crs="EPSG:32643")))
     assert layer_summary(loaded) == [("parcels", 1)]
-    assert loaded.layers[0].frame.crs.to_epsg() == 32643
-    assert loaded.layers[0].frame.loc[0, "name"] == "Plot 0"
+    assert loaded.layers[0].crs.to_epsg() == 32643
+    assert loaded.layers[0].features[0].properties == {"name": "Plot 0"}
 
 
 def test_shapefile_without_prj_has_no_crs(tmp_path, work_dir):
     loaded = load_zip(tmp_path, work_dir, without(shapefile_parts(plots()), ".prj"))
-    assert loaded.layers[0].frame.crs is None
+    assert loaded.layers[0].crs is None
 
 
 def test_two_shapefiles_keep_their_own_crs(tmp_path, work_dir):
@@ -125,7 +124,7 @@ def test_two_shapefiles_keep_their_own_crs(tmp_path, work_dir):
         **shapefile_parts(plots(crs="EPSG:4326"), stem="geographic"),
         **shapefile_parts(plots(crs="EPSG:32643"), stem="projected"),
     }
-    layers = {layer.name: layer.frame.crs.to_epsg() for layer in load_zip(tmp_path, work_dir, entries).layers}
+    layers = {layer.name: layer.crs.to_epsg() for layer in load_zip(tmp_path, work_dir, entries).layers}
     assert layers == {"geographic": 4326, "projected": 32643}
 
 
@@ -149,7 +148,7 @@ def test_upper_case_extensions_are_read(tmp_path, work_dir):
     entries = {name.upper(): data for name, data in shapefile_parts(plots(crs="EPSG:32643")).items()}
     loaded = load_zip(tmp_path, work_dir, entries)
     assert layer_summary(loaded) == [("PARCELS", 1)]
-    assert loaded.layers[0].frame.crs.to_epsg() == 32643
+    assert loaded.layers[0].crs.to_epsg() == 32643
 
 
 def test_macos_metadata_entries_are_ignored(tmp_path, work_dir):

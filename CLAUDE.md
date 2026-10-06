@@ -96,7 +96,12 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
   (`docs/CRS.md` §9).
 - **Routes contain no geospatial logic.** GeoPandas, Shapely and pyproj are imported only in
   `app/services/`. This keeps the services unit-testable without the API and makes live
-  interview changes (add perimeter, add GeoJSON) a small edit in one place.
+  interview changes (add perimeter, add GeoJSON) a small edit in one place. The upload
+  route reaches the processor only through `Depends(get_processor)`, wired in `main.py`;
+  it never imports it, not even lazily (D28).
+- **Nothing from pandas or numpy leaves the loader.** Properties pass through
+  `to_json_safe`, because NaN is written happily by `json.dumps` and only fails later as a
+  500 on GET (D29).
 - **One bad feature never sinks the file.** Each feature is processed inside its own error
   boundary. A feature that fails is recorded with a note and the loop continues. Only
   file-level problems (corrupt zip, missing `.shp`) mark the whole file `FAILED`.
