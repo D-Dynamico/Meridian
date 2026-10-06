@@ -68,7 +68,19 @@ Response 200:
 ```
 
 The fields shown in the brief's example (`id`, `filename`, `feature_count`, `crs`, `status`) must
-always be present. `summary` is null until the file is `COMPLETED`.
+always be present. `summary` is null until the file is `COMPLETED`, and `feature_count` is
+null until processing has finished.
+
+`summary` is computed from the stored features on every read. `by_type` counts features by
+geometry type as read; features with no geometry at all are counted under `"No geometry"`.
+The totals add up measured values only, so points and unmeasurable features add nothing.
+
+Rounding happens only in responses: `m2` and `m` values to 2 decimals (finer than UTM's
+accuracy), hectares and km to 4 (so one square metre still shows in hectares). Stored
+values are never rounded.
+
+An id that is not a valid UUID returns 422 (FastAPI's validation error); a valid UUID that
+matches no file returns 404.
 
 `crs` is `MIXED` when a zip holds shapefiles with different CRSs; each measurement then
 carries its own `source_crs`. When `crs_assumed` is true, `crs` holds the assumed value

@@ -148,3 +148,18 @@ def kml_point(shape: Point = GATE) -> str:
 
 def _coord(x: float, y: float, z: float | None) -> str:
     return f"{x},{y}" if z is None else f"{x},{y},{z}"
+
+
+def survey_kml() -> bytes:
+    """A two-folder KML with a 1 km square, a 1 km line, a point and a placemark with no
+    geometry, near Jaipur. Used by the processor and end-to-end API tests."""
+    jaipur = (75.79, 26.91)
+    return kml(
+        folder("Parcels", placemark("Plot 12", kml_polygon(ground_square(*jaipur)), {"owner": "Asha"}))
+        + folder(
+            "Roads",
+            placemark("Access road", kml_line(ground_line(*jaipur))),
+            placemark("Gate", kml_point()),
+            "<Placemark><name>Unplaced</name></Placemark>",
+        )
+    ).encode()

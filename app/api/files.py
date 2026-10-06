@@ -10,6 +10,7 @@ hidden from the schema, so neither form is answered with a redirect
 """
 
 import shutil
+import uuid
 from pathlib import PurePath, PureWindowsPath
 from typing import Annotated
 
@@ -18,8 +19,15 @@ from sqlmodel import func, select
 
 from app.api.deps import ProcessorDep, SessionDep, SettingsDep
 from app.core.config import FORMAT_BY_EXTENSION
-from app.db.models import File, FileFormat
-from app.schemas.files import FileListItem, FileListResponse, UploadResponse
+from app.db import queries
+from app.db.models import File, FileFormat, FileStatus
+from app.schemas.files import (
+    FileDetail,
+    FileListItem,
+    FileListResponse,
+    Summary,
+    UploadResponse,
+)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -107,6 +115,25 @@ def list_files(
         offset=offset,
         results=[FileListItem.model_validate(f, from_attributes=True) for f in files],
     )
+
+
+@router.get("/{file_id}", response_model=FileDetail, include_in_schema=False)
+@router.get("/{file_id}/", response_model=FileDetail, responses={404: {"description": "File not found"}})
+def get_file(file_id: uuid.UUID, session: SessionDep):
+    """File information and status, with a summary once processing has completed."""
+    file = _get_or_404(session, file_id)
+    summary = None
+    if file.status == FileStatus.COMPLETED:
+        totals = queries.file_totals(session, file_id)
+        summary = Summary.from_totals(totals.by_type, totals.area_m2, totals.length_m)
+    return FileDetail(**file.model_dump(), summary=summary)
+
+
+def _get_or_404(session, file_id: uuid.UUID) -> File:
+    file = session.get(File, file_id)
+    if file is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+    return file
 
 
 def _size_of(upload: UploadFile) -> int:

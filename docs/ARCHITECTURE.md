@@ -65,6 +65,7 @@ app/
   core/config.py       Upload size limit, allowed extensions, storage paths
   db/models.py         SQLModel tables: File, Feature
   db/session.py        Engine creation (SQLite thread and foreign-key settings), tables
+  db/queries.py        Read queries behind the API: summary totals, measurement pages
   schemas/files.py     Pydantic response models
   services/
     loader.py          Zip validation and safe extraction, KML reading, layer iteration.
