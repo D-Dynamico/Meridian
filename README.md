@@ -18,53 +18,29 @@ repaired on the way, says so in the response.
 
 ## Quick start
 
-Requires Python 3.12, or Docker. Everything runs offline: no API keys, no external
-services, no system GDAL (the pyogrio and pyproj wheels bundle GDAL and PROJ).
-
-**With a virtual environment**
+Requires Python 3.12, or Docker. Everything runs offline: no API keys and no system GDAL
+(the pyogrio and pyproj wheels bundle GDAL and PROJ).
 
 ```bash
 git clone https://github.com/D-Dynamico/Meridian.git
 cd Meridian
-python3.12 -m venv .venv                       # Windows: py -3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt    # Windows: .venv\Scripts\python
+
+# Either a virtual environment (on Windows: py -3.12, and .venv\Scripts\python)
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m uvicorn app.main:app
-```
 
-**With Docker**
-
-```bash
-git clone https://github.com/D-Dynamico/Meridian.git
-cd Meridian
+# Or Docker (add -v meridian-data:/data to keep data between runs)
 docker build -t meridian .
-docker run --rm -p 8000:8000 meridian          # add -v meridian-data:/data to keep data
+docker run --rm -p 8000:8000 meridian
 ```
 
-Then open **http://127.0.0.1:8000/docs** for the interactive API, where you can upload a
-file from `samples/` with "Try it out". Or from a terminal:
+Open **http://127.0.0.1:8000/docs** and upload a file from `samples/` with "Try it out",
+or use `curl -F "file=@samples/survey.kml" http://127.0.0.1:8000/api/files/` (`curl.exe`
+in Windows PowerShell 5).
 
-```bash
-curl -F "file=@samples/survey.kml" http://127.0.0.1:8000/api/files/
-curl http://127.0.0.1:8000/api/files/<id>/
-curl http://127.0.0.1:8000/api/files/<id>/measurements/
-```
-
-On Windows PowerShell 5, type `curl.exe` rather than `curl`, which is an alias for
-`Invoke-WebRequest` there.
-
-**Run the tests**
-
-```bash
-.venv/bin/python -m pytest -q                                      # 231 tests, about 12 s
-docker run --rm meridian python -m pytest -q -p no:cacheprovider   # the same suite on Linux
-```
-
-**Configuration** (optional, both have defaults):
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `MERIDIAN_DATA_DIR` | `data/` (`/data` in Docker) | SQLite database and temporary upload folders |
-| `MERIDIAN_MAX_UPLOAD_MB` | `50` | Largest accepted upload |
+Optional settings: `MERIDIAN_DATA_DIR` (default `data/`, `/data` in Docker) and
+`MERIDIAN_MAX_UPLOAD_MB` (default 50).
 
 ## Sample files
 
@@ -100,32 +76,17 @@ amount. That gap is the UTM scale factor, not an error, and is explained under
 | GET | `/api/files/` | List uploads, newest first (extra) | 200 |
 | GET | `/health` | Liveness check (extra) | 200 |
 
-The first three are the brief's. Paths are also served without the trailing slash. The
-full reference, including every error message, is [`docs/API.md`](docs/API.md). The
-examples below are real responses for `samples/survey.kml`.
+The full reference, with every query parameter and error message, is
+[`docs/API.md`](docs/API.md). Real responses for `samples/survey.kml`:
 
-### Upload
-
-```bash
-curl -F "file=@samples/survey.kml" http://127.0.0.1:8000/api/files/
-```
+**Upload** returns 202 as soon as the file is saved. Status then moves from `PENDING` to
+`PROCESSING` to `COMPLETED` or `FAILED`.
 
 ```json
-{
-  "id": "474546b6-4620-46a5-acfd-a4cebff0eaa8",
-  "filename": "survey.kml",
-  "status": "PENDING"
-}
+{ "id": "474546b6-4620-46a5-acfd-a4cebff0eaa8", "filename": "survey.kml", "status": "PENDING" }
 ```
 
-The response is 202 as soon as the file is saved. Status then moves from `PENDING` to
-`PROCESSING` to `COMPLETED` or `FAILED`; the samples take well under a second.
-
-### File information
-
-```bash
-curl http://127.0.0.1:8000/api/files/474546b6-4620-46a5-acfd-a4cebff0eaa8/
-```
+**File information**, `GET /api/files/{id}/`:
 
 ```json
 {
@@ -149,60 +110,8 @@ curl http://127.0.0.1:8000/api/files/474546b6-4620-46a5-acfd-a4cebff0eaa8/
 }
 ```
 
-`summary` is null until the file is `COMPLETED`. A `FAILED` file carries the reason in
-`error`, for example `"Shapefile 'parcels' is missing .shx and .dbf"`. `crs` is `MIXED`
-when a zip holds shapefiles in different CRSs, and `crs_assumed` is true when a `.prj` was
-missing and EPSG:4326 was inferred.
-
-### Measurements
-
-```bash
-curl "http://127.0.0.1:8000/api/files/474546b6-4620-46a5-acfd-a4cebff0eaa8/measurements/?limit=2&offset=2"
-```
-
-```json
-{
-  "file_id": "474546b6-4620-46a5-acfd-a4cebff0eaa8",
-  "count": 5,
-  "limit": 2,
-  "offset": 2,
-  "results": [
-    {
-      "index": 2,
-      "layer": "Roads",
-      "geometry_type": "LineString",
-      "source_crs": "EPSG:4326",
-      "measurement_method": "projected",
-      "measurement_crs": "EPSG:32643",
-      "measurement": { "type": "length", "value": 999.68, "unit": "m", "km": 0.9997 },
-      "geodesic_value": 1000.0,
-      "repaired": false,
-      "note": null,
-      "properties": { "Name": "Access road", "surface": "gravel" },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [[75.79, 26.91], [75.79, 26.919025093445534]]
-      }
-    },
-    {
-      "index": 3,
-      "layer": "Roads",
-      "geometry_type": "Point",
-      "source_crs": "EPSG:4326",
-      "measurement_method": null,
-      "measurement_crs": null,
-      "measurement": null,
-      "geodesic_value": null,
-      "repaired": false,
-      "note": "No measurement for point geometries",
-      "properties": { "Name": "Site gate", "surface": null },
-      "geometry": { "type": "Point", "coordinates": [75.79035592561509, 26.910319084987027] }
-    }
-  ]
-}
-```
-
-A repaired polygon from the same file, requested with `include_geometry=false`:
+**Measurements**, `GET /api/files/{id}/measurements/`, one result from the page (the
+repaired plot, with `include_geometry=false`):
 
 ```json
 {
@@ -220,37 +129,14 @@ A repaired polygon from the same file, requested with `include_geometry=false`:
 }
 ```
 
-Query parameters: `limit` (default 100, at most 1000), `offset`, `geometry_type` (for
-example `Polygon`) and `include_geometry` (default true).
+Every result carries every field, with null where there is no value. `value` is in `m2`
+or `m`; hectares and km are convenience fields beside it. `geometry` (GeoJSON in the
+source CRS) is included by default. Pages take `limit`, `offset` and `geometry_type`.
 
-How to read a result:
-
-- Every result carries every field, with null where there is no value.
-- `measurement.value` is in `m2` or `m`, the canonical units. `hectares` or `km` is a
-  convenience field beside it, never a replacement.
-- `measurement_method` is `projected` (measured in `measurement_crs`, a UTM zone) or
-  `geodesic` (only beyond UTM's latitude limits). It is never inferred from a null.
-- `geodesic_value` is the ellipsoidal cross-check, always present on a measured feature.
-- `geometry` is GeoJSON in the source CRS, as read from the file.
-- `note` explains anything assumed, repaired, ignored or not measured. Several notes are
-  joined with `"; "`, for example `"CRS assumed EPSG:4326 (no .prj); repaired invalid
-  geometry"`.
-
-### Errors
-
-Every error has the shape `{"detail": "<reason>"}`.
-
-| Case | Code | Detail |
-|---|---|---|
-| Unsupported extension | 415 | Only .kml and .zip files are supported |
-| File too large | 413 | Maximum upload size is 50 MB |
-| Unknown file id | 404 | File not found |
-| Measurements before completion | 409 | File is still PROCESSING |
-| Measurements for a failed file | 409 | File processing FAILED: Shapefile 'parcels' is missing .shx and .dbf |
-
-A broken file does not fail the upload request. Problems inside the file (corrupt zip,
-missing parts, malformed KML) surface as `status: FAILED` with a readable `error`, and
-never contain server paths or exception internals.
+**Errors** are `{"detail": "<reason>"}`: 415 for an unsupported extension, 413 over the
+size limit, 404 for an unknown id, and 409 for measurements before the file is
+`COMPLETED`. A broken file does not fail the upload; it becomes `FAILED` with a readable
+`error`, such as `"Shapefile 'parcels' is missing .shx and .dbf"`.
 
 ## Architecture
 
@@ -269,17 +155,13 @@ app/
     crs.py             Source CRS, UTM zone choice, cached transformers
     measure.py         Area, length, repair, notes, geodesic cross-check
     processor.py       Runs loader, CRS and measure per file; status transitions
-tests/                 231 tests, inputs built in code
-scripts/               Sample generator and the mutation-check runner
-samples/               Files to upload straight away
-docs/                  Design docs and dated session notes
+tests/  scripts/  samples/  docs/
 ```
 
 **Routes contain no geospatial logic.** GeoPandas, Shapely and pyproj are imported only
-under `app/services/`, and a test enforces it by importing the routes in a clean
-subprocess. The upload route does not even import the processor: it receives it through
-`Depends(get_processor)`, and `main.py` wires the real one. That keeps the services
-testable without HTTP and lets the tests swap in a no-op or a synchronous processor.
+under `app/services/`, and a test enforces it. The upload route receives the processor
+through `Depends(get_processor)`, so it never imports it, and tests can swap in a no-op
+or a synchronous one. Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ### File-processing flow
 
@@ -299,27 +181,15 @@ flowchart TD
     H & J --> K[Upload and extraction folder deleted]
 ```
 
-1. **Upload.** A middleware rejects a body over the limit before FastAPI reads it (FastAPI
-   parses the whole multipart body before any handler runs, so a check in the route
-   alone would only fire after a 2 GB upload had been received). The route checks the
-   extension and exact size, stores the file under its id, never the client's name, and
-   returns 202.
-2. **Loading.** For a zip: reject any entry path that could escape the folder (zip slip),
-   refuse a zip declaring more than 500 MB uncompressed, ignore macOS metadata, match
-   extensions case-insensitively, require `.shp`, `.shx` and `.dbf` for every shapefile,
-   and read each shapefile as its own layer with its own CRS. For a KML: list every layer
-   and read each one, keeping the folder name per feature. Attribute values are made
-   JSON-safe, so no NaN or numpy value reaches the database.
-3. **Measuring.** Each feature goes through the CRS and measure services inside its own
-   error boundary. One bad feature records a note and the loop continues; only a
-   file-level problem marks the file `FAILED`.
-4. **Recording.** All rows are written and the file marked `COMPLETED` in one transaction,
-   so a failed file never keeps partial results. The upload is deleted in a `finally`
-   block. On startup, any file left `PENDING` or `PROCESSING` by a stopped server is
-   marked `FAILED` with a message to upload it again, instead of showing `PROCESSING`
-   forever.
+Along the way:
 
-The read endpoints only ever touch the database.
+- **Zips are untrusted.** Entries that could escape the folder (zip slip) are rejected,
+  zips declaring more than 500 MB uncompressed are refused, and each shapefile must have
+  its `.shp`, `.shx` and `.dbf`.
+- **Every KML layer is read**, not just the first, and each feature keeps its folder name.
+- **One bad feature never sinks the file.** It gets a note and the loop continues.
+- **Interrupted files are not left hanging.** On startup, anything still `PENDING` or
+  `PROCESSING` is marked `FAILED` with a message to upload it again.
 
 ### Measurement flow, per feature
 
@@ -409,130 +279,57 @@ alternatives considered for each.
 ## Testing
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q                                      # 231 tests, about 12 s, offline
+docker run --rm meridian python -m pytest -q -p no:cacheprovider   # the same suite on Linux
 ```
 
-231 tests, offline, in about 12 seconds. Every input is built in code, so each expected
-value is visible in the test that uses it. The ones that matter most:
-
-- **Accuracy fixtures built on the ground.** Squares and lines are walked out with
-  `Geod.fwd` in lon/lat. A square drawn in UTM coordinates and measured in the same zone
-  always comes out at exactly 1,000,000 m2, so it would pass with the CRS code deleted.
-- **Location-aware tolerances.** Projected and geodesic must agree within 0.25 percent for
-  area and 0.15 percent for length, and the gap must match the UTM scale-factor formula
-  within 0.005 percent, which a wrong zone fails.
-- **The EPSG code, not only the area.** A square at 56°N and the same square at 56°S
-  measure identically, so a hemisphere bug only shows in the code.
-- **End to end** for both formats through the API with the real processor, including the
-  sample files.
-
-**Mutation checks.** A test that cannot fail protects nothing.
-`scripts/mutation_check.py` applies 88 deliberate bugs one at a time (skip the transform,
-swap lon and lat, read only the first KML layer, drop the zip-slip check, and so on) and
-confirms that each turns a test red. All 88 are caught. Several real gaps were found this
-way; see [Learnings](#learnings).
-
-```bash
-.venv/bin/python scripts/mutation_check.py --check   # patterns still match, seconds
-.venv/bin/python scripts/mutation_check.py           # every mutation, about 10 minutes
-```
+- **Accuracy fixtures are built on the ground** with `Geod.fwd`. A square drawn in UTM
+  and measured in the same zone is always exactly 1,000,000 m2, so it would pass with the
+  CRS code deleted.
+- **Tests assert the EPSG code, not only the area**, because the same square at 56°N and
+  56°S measures identically. The projected gap must also match the scale-factor formula,
+  which a wrong zone fails.
+- **Mutation checks.** `scripts/mutation_check.py` applies 88 deliberate bugs one at a
+  time (skip the transform, swap lon and lat, read only the first KML layer, drop the
+  zip-slip check, and so on) and confirms each turns a test red. All 88 are caught.
 
 ## Learnings
 
-Each of these was found by probing the real libraries or by a mutation check, not
-assumed. The dated notes in [`docs/sessions/`](docs/sessions/) have the full detail.
+Each was found by probing the real libraries or by a mutation check. Details are in
+[`docs/sessions/`](docs/sessions/).
 
-**Geospatial**
-
-- **`abs()` on a geodesic area is not enough.** `Geod` signs area by ring orientation, and
-  shapefile exteriors are clockwise. Taking `abs()` fixes the overall sign only: a
-  MultiPolygon with one part each way measured 0, and a hole wound like its exterior was
-  added instead of subtracted (1,039,960 m2 instead of 959,961 m2). Rings are now
-  oriented first.
-- **A valid polygon can have no area.** Shapely accepts a collinear polygon, so
-  `make_valid` never runs, and its area in degrees is floating-point dust rather than 0.
-  Transformed, a 3 km sliver gained 139 m2 of artificial area, because a line straight
-  in lon/lat is curved in UTM. "No area" is now judged by a unitless ratio in the source
-  CRS.
-- **`make_valid` can return lines.** A polygon that doubles back on itself repairs to a
-  MultiLineString, which a naive dispatcher would have measured as a length.
-- **The planned accuracy tolerance would have failed correct code.** A 0.1 percent band
-  held only because the first fixture sat near its zone's central meridian. Bengaluru
-  sits at +0.116 percent and a zone edge at +0.195 percent.
-- **Measuring UTM in place keeps UTM's distortion.** The Bengaluru parcels, stored in
-  UTM, report 0.116 percent more area than the ground. Skipping the transform saves work;
-  it does not make the number truer. The geodesic value is the closer answer.
-- **GDAL is more forgiving than the brief.** It reads a shapefile with no `.dbf` and
-  silently returns no attributes, so the loader's own required-part check is what keeps
-  "every feature reports its properties" true.
-- **KML through LIBKML carries display defaults.** Every feature gets `tessellate`,
-  `extrude` and `visibility` filled in even when the file has none, so they cannot be
-  told apart from real values and are dropped. Nested folders come back as flat layers,
-  and a KML with no placemarks has zero layers, which made GeoPandas' default read crash
-  with a bare `IndexError`.
-
-**Python and FastAPI**
-
-- **Invalid JSON can hide in the database.** pandas 3 reports missing values as float
-  NaN, and `json.dumps` writes NaN by default, which is not valid JSON. Responses looked
-  fine because Pydantic turns NaN into null on the way out; only the stored text showed
-  the damage. Attributes are now cleaned in the loader, and a test checks the stored text
-  with SQLite's `json_valid`.
-- **`numpy.float64` is a subclass of `float`.** A cleaning function that checked plain
-  types first let numpy scalars through untouched.
-- **A size check in a FastAPI route comes too late.** The multipart body is fully
-  received and parsed before any dependency runs. The limit had to move into ASGI
-  middleware, and it must raise `HTTPException`: anything else is turned into a generic
-  400.
-- **Some code could never run.** Byte counting during zip extraction (Python's zipfile
-  never yields more than an entry declares, and an understated size fails its CRC), a
-  fallback that GDAL makes unreachable, and a Z-stripping step for operations that are
-  already 2D. Each was found because its mutation stayed green, and each was removed.
-
-**Tests that could not fail**
-
-- A `.gitattributes` test passed with the `*.shp` rule deleted, because Windows ignores
-  case and `*.SHP` matched instead. It now forces case sensitivity, as on Linux.
-- Disconnecting the size middleware left every test green, because the route's own check
-  also answers 413. Middleware tests now upload an unsupported extension, so a 413 can
-  only come from the middleware.
-- A backslash zip-slip test did nothing on Windows, where zipfile already converts
-  backslashes. It is also tested at the function level now, and the suite runs in the
-  Linux container.
+- **`abs()` on a geodesic area is not enough.** It fixes only the overall sign: a
+  MultiPolygon with parts wound both ways measured 0. Rings are now oriented first.
+- **A valid polygon can have no area.** A collinear polygon passes Shapely's validity
+  check, and once projected a 3 km sliver gained 139 m2 of artificial area.
+- **`make_valid` can return lines**, which a naive dispatcher would measure as a length.
+- **A 0.1 percent accuracy tolerance would have failed correct code.** It held only near
+  the central meridian; Bengaluru sits at +0.116 percent.
+- **GDAL reads a shapefile with no `.dbf`** and silently drops every attribute, so the
+  loader's own part check is what keeps properties in the response.
+- **Invalid JSON can hide in the database.** pandas reports missing values as NaN,
+  `json.dumps` stores it, and Pydantic turns it into null on the way out, so responses
+  looked fine. Attributes are now cleaned in the loader.
+- **A size check in a FastAPI route comes too late:** the whole body is received first.
+  It moved to ASGI middleware.
+- **Several tests could not fail**, such as a size-limit test that stayed green with the
+  middleware removed because the route also answers 413. Mutation checks found them.
 
 ## Limitations and future scope
 
-**Known limitations**
+**Known limitations:** one UTM zone is a poor fit for district-sized features or ones
+that cross zone boundaries (the geodesic value is the better answer there and is always
+reported); antimeridian-crossing geometry is not handled; one server process only,
+because background tasks live inside it.
 
-- **Very large features.** One UTM zone is a poor fit for a district-sized polygon or one
-  that crosses a zone boundary; the zone of the centroid is used. The geodesic value is
-  the better answer there, and is always reported.
-- **Antimeridian-crossing geometry** is not handled.
-- **One server process.** Background tasks live inside it, and startup recovery assumes
-  no other worker is mid-processing.
-- **Norway and Svalbard UTM exceptions** are not applied; the plain zone is still valid,
-  only slightly further from its central meridian.
+**Future scope**, deliberately left out:
 
-**Future scope**, deliberately left out of this take-home:
+- **Scale:** a durable queue (Celery or RQ) instead of `BackgroundTasks`, PostGIS instead
+  of SQLite, upload limits at a reverse proxy.
+- **Measurement:** a local equal-area projection for very large features, perimeter, 3D,
+  volume and DEM-based measurement from drone surveys.
+- **Formats:** GeoJSON, GeoPackage and KMZ, each a small change in the loader.
+- **Product:** authentication, a map view, editing and exporting processed files.
 
-- **Scale:** a durable queue (Celery or RQ with Redis) instead of `BackgroundTasks`,
-  PostGIS instead of SQLite, upload limits at a reverse proxy, multiple workers.
-- **Measurement:** automatic switch to geodesic or a local equal-area projection for very
-  large features, perimeter for polygons, 3D, volume and DEM-based measurement from
-  drone surveys.
-- **Formats:** GeoJSON, GeoPackage and KMZ (each a small change in the loader, since the
-  measurement path is format-agnostic).
-- **Product:** authentication and per-user files, a map view, editing, re-projecting and
-  downloading processed files.
-
-## Further reading
-
-| Doc | Contents |
-|---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The brief, scope, module map, data model, both flows, edge cases |
-| [`docs/API.md`](docs/API.md) | Full endpoint reference and every error message |
-| [`docs/CRS.md`](docs/CRS.md) | Projection strategy, zone selection, accuracy figures, edge cases |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 31 decisions with the alternatives considered |
-| [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) | Fixtures, per-module requirements, mutation checks |
-| [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) | Setup, file lifecycle, build stages, definition of done |
-| [`docs/sessions/`](docs/sessions/) | Dated notes: what changed, why, and what nearly broke |
+More in [`docs/`](docs/SYSTEM_DESIGN.md): architecture, API reference, CRS strategy, all 31
+decisions, test plan and dated session notes.
