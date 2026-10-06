@@ -60,15 +60,20 @@ FastAPI, Pydantic, GeoPandas with pyogrio, Shapely 2, pyproj, SQLModel on SQLite
 `BackgroundTasks`, pytest. No external APIs and no API keys. Everything runs offline.
 Rationale for each choice: `docs/DECISIONS.md` §10.
 
-## Commands (planned, fill in as the project takes shape)
+## Commands
 
-- Create a venv and install from `requirements.txt`
-- Run the API with uvicorn against `app.main:app`, then open `/docs` for the OpenAPI UI
-- Run the full test suite with `pytest` (offline, no fixtures downloaded)
-- Build and run with Docker for a one-command reviewer setup
+```
+py -3.12 -m venv .venv                                  # Linux/macOS: python3.12 -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt # Linux/macOS: .venv/bin/python
+.venv/Scripts/python -m uvicorn app.main:app --reload   # then open http://127.0.0.1:8000/docs
+.venv/Scripts/python -m pytest -q                       # offline, no fixtures downloaded
+```
 
-Once the commands exist, replace this list with the exact lines and keep them working.
-On Windows the venv interpreter lives under `.venv/Scripts/`, not `.venv/bin/`.
+Optional environment: `MERIDIAN_DATA_DIR` (default `data/`), `MERIDIAN_MAX_UPLOAD_MB`
+(default 50). Docker arrives in Stage 6; add its commands here then.
+
+**File tooling on Windows:** always pass `encoding="utf-8"` when a script reads or writes
+repo files. The default is cp1252, which double-encodes `§` on the way back out.
 
 ## Architecture in one paragraph
 
@@ -123,9 +128,11 @@ Full detail, module map and data model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 
 ## Status
 
-Stage 0 (planning and docs) complete and reviewed against real pyproj, Shapely and pyogrio
-behaviour (`docs/sessions/2026-10-07-stage1.md`). No application code yet. Next: **Stage 1**, project
-skeleton, data model and upload route. Stages and exit criteria: `docs/WORKFLOWS.md` §13.
+Stage 0 (docs, reviewed against real library behaviour) and **Stage 1** (skeleton, data
+model, upload with size middleware, list, health, architecture guard) complete; see
+`docs/sessions/2026-10-07-stage1.md`. Uploads stay `PENDING` until Stage 4 wires the
+processor. Next: **Stage 2**, the loader. Stages and exit criteria: `docs/WORKFLOWS.md`
+§13.
 
 Open questions are tracked in the newest session note, not here.
 
