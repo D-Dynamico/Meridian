@@ -158,27 +158,43 @@ passes whether or not the CRS handling is right (`CRS.md` §9.5).
 
 ## §17 Mutation checks
 
-Before Stage 5 exits, apply each mutation by hand, confirm at least one test fails, then
-revert. Record the results in the session note. A mutation that leaves the suite green means
-a test is missing.
+A mutation check breaks one guard on purpose and confirms that a test fails. A mutation
+that leaves the suite green means a test is missing, or that the code it targets is dead.
+
+They are automated in `scripts/mutation_check.py`, with every mutation listed in
+`scripts/mutations.json`. Each entry is an exact text replacement in one file; the script
+applies it, runs the tests, and restores the file in a `finally` block.
+
+```
+python scripts/mutation_check.py            # every mutation, about 10 minutes
+python scripts/mutation_check.py --check    # only confirm every pattern still matches
+python scripts/mutation_check.py zip-slip   # mutations whose name contains "zip-slip"
+```
+
+Run `--check` after any refactor. Patterns are exact source text, so a refactor can turn
+a mutation stale, and `--check` names it instead of letting it be skipped. (Stage 5 found
+five stale patterns this way.)
+
+The mutations below are the documented core. For each, `mutations.json` names the tests
+in the right-hand column under `expect`, and those exact tests must fail, not just any
+test. The other entries in the file, from every stage, only need some test to fail.
 
 | Mutation | Must be caught by |
 |---|---|
 | Skip the CRS transform and measure in source coordinates | Square area test |
-| Swap lon and lat (drop `always_xy`) | Zone selection test or area tolerance test |
-| Always use zone 43 regardless of location | Southern-hemisphere test |
-| Always use the northern hemisphere (326xx) | Southern-hemisphere EPSG code assertion (an area assertion would stay green) |
+| Swap lon and lat (drop `always_xy`) | Axis order test |
+| Always use zone 43 regardless of location | Southern-hemisphere EPSG code test |
+| Always use the northern hemisphere (326xx) | Hemisphere code test (an area assertion would stay green) |
 | Read only the first KML layer | Multi-layer KML test |
 | Remove the per-feature error boundary | Processor single-failure test |
 | Remove `make_valid` | Bowtie test |
-| Measure whatever `make_valid` returns, including lines | Degenerate sliver test |
+| Measure whatever `make_valid` returns, including lines | Repairs-to-lines test |
 | Drop ring orientation on the geodesic area | Clockwise polygon test |
-| `abs()` instead of ring orientation | Mixed-orientation MultiPolygon and same-wound hole tests |
+| `abs()` instead of ring orientation | Mixed-orientation MultiPolygon test and same-wound hole test |
 | Exact `area == 0` instead of the ratio test | Valid collinear polygon test |
 | Trust any projected CRS in metres | Web Mercator test |
-| Trust any projected CRS in metres | EPSG:3857 test |
 | Drop the zip-slip check | Zip-slip test |
-| Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test, and the stored-text `json_valid` check in the measurements round-trip test |
+| Remove `to_json_safe` (pass raw pandas values) | Strict-serialization loader test and the stored-text `json_valid` check in the measurements round trip |
 | Route imports the processor directly | Architecture guard |
-| Silently assume 4326 without setting the flag | Missing `.prj` test |
-| Return geodesic value equal to projected value | Cross-check agreement is not enough here; add a test that the geodesic path runs on unprojected input |
+| Silently assume 4326 without setting the flag | Missing-CRS test in the CRS service and missing `.prj` test in the processor |
+| Return the projected value as the geodesic value | Geodesic-independence test |

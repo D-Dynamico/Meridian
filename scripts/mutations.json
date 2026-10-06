@@ -1,0 +1,945 @@
+[
+ {
+  "name": "gitattributes: drop *.shp binary",
+  "path": ".gitattributes",
+  "edits": [
+   [
+    "*.shp binary\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "gitattributes: drop *.SHP binary",
+  "path": ".gitattributes",
+  "edits": [
+   [
+    "*.SHP binary\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "gitattributes: drop *.zip binary",
+  "path": ".gitattributes",
+  "edits": [
+   [
+    "*.zip binary\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "gitattributes: drop LF for text",
+  "path": ".gitattributes",
+  "edits": [
+   [
+    "* text=auto eol=lf\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "upload: unwire the size middleware",
+  "path": "app/main.py",
+  "edits": [
+   [
+    "    app.add_middleware(\n        UploadSizeLimitMiddleware,\n        max_body_bytes=settings.max_body_bytes,\n        limit_label=settings.max_upload_label,\n    )\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "upload: middleware stops counting bytes",
+  "path": "app/api/upload_limit.py",
+  "edits": [
+   [
+    "                    raise HTTPException(status_code=413, detail=self.detail)",
+    "                    pass"
+   ]
+  ]
+ },
+ {
+  "name": "upload: no Content-Length shortcut",
+  "path": "app/api/upload_limit.py",
+  "edits": [
+   [
+    "if declared is not None and declared > self.max_body_bytes:",
+    "if False:"
+   ]
+  ]
+ },
+ {
+  "name": "upload: no exact file-size check in the route",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "if _size_of(file) > settings.max_upload_bytes:",
+    "if False:"
+   ]
+  ]
+ },
+ {
+  "name": "db: SQLite foreign keys off",
+  "path": "app/db/session.py",
+  "edits": [
+   [
+    "cursor.execute(\"PRAGMA foreign_keys=ON\")",
+    "pass"
+   ]
+  ]
+ },
+ {
+  "name": "upload: extension check case-sensitive",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "suffix.lower()",
+    "suffix"
+   ]
+  ]
+ },
+ {
+  "name": "upload: trust the client filename",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "PureWindowsPath(file.filename or \"\").name",
+    "file.filename or \"\""
+   ]
+  ]
+ },
+ {
+  "name": "list: oldest first",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "File.created_at.desc()",
+    "File.created_at"
+   ]
+  ]
+ },
+ {
+  "name": "list: drop slashless list alias",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "@router.get(\"\", response_model=FileListResponse, include_in_schema=False)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "list: drop slashless upload alias",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "@router.post(\n    \"\", status_code=status.HTTP_202_ACCEPTED, response_model=UploadResponse,\n    include_in_schema=False,\n)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "list: plain DateTime column (naive on read)",
+  "path": "app/db/models.py",
+  "edits": [
+   [
+    "created_at: datetime = Field(default_factory=utcnow, index=True)",
+    "created_at: datetime = Field(default_factory=utcnow, index=True, sa_type=__import__('sqlalchemy').DateTime)"
+   ]
+  ]
+ },
+ {
+  "name": "architecture: routes import shapely directly",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "import shutil\n",
+    "import shutil\nimport shapely\n"
+   ]
+  ]
+ },
+ {
+  "name": "architecture: a dependency of the routes imports pyproj",
+  "path": "app/core/config.py",
+  "edits": [
+   [
+    "import os\n",
+    "import os\nimport pyproj\n"
+   ]
+  ]
+ },
+ {
+  "name": "loader: read only the first KML layer",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "layer_names = [name for name, _ in pyogrio.list_layers(path)]",
+    "layer_names = [name for name, _ in pyogrio.list_layers(path)][:1]"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_loader.py::test_multi_folder_kml_returns_every_layer"
+  ]
+ },
+ {
+  "name": "loader: keep KML display fields",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "drop = [f for f in KML_DISPLAY_FIELDS if f in frame] + unused",
+    "drop = unused"
+   ]
+  ]
+ },
+ {
+  "name": "loader: keep unused KML standard fields",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "drop = [f for f in KML_DISPLAY_FIELDS if f in frame] + unused",
+    "drop = [f for f in KML_DISPLAY_FIELDS if f in frame]"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the zip-slip check",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "            raise LoaderError(\n                f\"The zip contains an unsafe path that points outside the archive: {info.filename}\"\n            )",
+    "            continue"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_loader.py::test_zip_slip_entries_are_rejected_and_nothing_is_written"
+  ]
+ },
+ {
+  "name": "loader: zip-slip check misses drive letters",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    " or (parts and \":\" in parts[0])",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "loader: zip-slip check misses backslashes",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "        name = info.filename.replace(\"\\\\\", \"/\")\n        parts = PurePosixPath(name).parts",
+    "        name = info.filename\n        parts = PurePosixPath(name).parts"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the macOS metadata filter",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "    return \"__MACOSX\" in parts or parts[-1].startswith(\"._\") or parts[-1] == \".DS_Store\"",
+    "    return False"
+   ]
+  ]
+ },
+ {
+  "name": "loader: case-sensitive part matching",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "        key = str(posix.with_suffix(\"\")).lower()\n        by_stem.setdefault(key, {})[posix.suffix.lower()] = info",
+    "        key = str(posix.with_suffix(\"\"))\n        by_stem.setdefault(key, {})[posix.suffix] = info"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the required-parts check",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "        if missing:\n",
+    "        if False:\n"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the zip bomb size check",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "        if declared > max_extracted_bytes:",
+    "        if False:"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the encrypted-zip message",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "    except RuntimeError as exc:  # zipfile's error for an encrypted entry",
+    "    except ZeroDivisionError as exc:"
+   ]
+  ]
+ },
+ {
+  "name": "loader: skip temp cleanup",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "            shutil.rmtree(extract_root)",
+    "            pass"
+   ]
+  ]
+ },
+ {
+  "name": "loader: drop the path scrub",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "        message = message.replace(form, shown)",
+    "        pass"
+   ]
+  ]
+ },
+ {
+  "name": "loader: same-named layers not disambiguated",
+  "path": "app/services/loader.py",
+  "edits": [
+   [
+    "    return stem if len(same) == 1 else zip_path",
+    "    return stem"
+   ]
+  ]
+ },
+ {
+  "name": "properties: remove the helper (loader passes raw values)",
+  "path": "app/services/properties.py",
+  "edits": [
+   [
+    "    return {str(key): to_json_safe(value) for key, value in record.items()}",
+    "    return dict(record)"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_properties.py::test_shapefile_properties_come_out_plain_and_strictly_serializable",
+   "tests/test_measurements.py::test_null_properties_round_trip_as_json_nulls"
+  ]
+ },
+ {
+  "name": "properties: keep NaN and infinity",
+  "path": "app/services/properties.py",
+  "edits": [
+   [
+    "        return value if math.isfinite(value) else None",
+    "        return value"
+   ]
+  ]
+ },
+ {
+  "name": "properties: plain types checked before numpy",
+  "path": "app/services/properties.py",
+  "edits": [
+   [
+    "    # numpy checks come first: numpy.float64 subclasses float and numpy.str_ subclasses\n    # str, so the plain-type checks below would pass them through as numpy values.\n    if isinstance(value, np.datetime64):\n        # .item() on a nanosecond datetime64 returns an int, not a datetime, so go\n        # through pandas instead.\n        return None if np.isnat(value) else pd.Timestamp(value).isoformat()\n    if isinstance(value, np.generic):\n        # numpy.int64, numpy.float64, numpy.bool_: .item() gives the Python equivalent,\n        # which still has to pass the NaN and infinity check below.\n        return to_json_safe(value.item())\n    # bool is a subclass of int; both pass through unchanged.\n    if isinstance(value, (bool, int, str)):\n        return value\n    if isinstance(value, float):\n        return value if math.isfinite(value) else None\n",
+    "    # bool is a subclass of int; both pass through unchanged.\n    if isinstance(value, (bool, int, str)):\n        return value\n    if isinstance(value, float):\n        return value if math.isfinite(value) else None\n    # numpy checks come first: numpy.float64 subclasses float and numpy.str_ subclasses\n    # str, so the plain-type checks below would pass them through as numpy values.\n    if isinstance(value, np.datetime64):\n        # .item() on a nanosecond datetime64 returns an int, not a datetime, so go\n        # through pandas instead.\n        return None if np.isnat(value) else pd.Timestamp(value).isoformat()\n    if isinstance(value, np.generic):\n        # numpy.int64, numpy.float64, numpy.bool_: .item() gives the Python equivalent,\n        # which still has to pass the NaN and infinity check below.\n        return to_json_safe(value.item())\n"
+   ]
+  ]
+ },
+ {
+  "name": "properties: datetime64 through .item()",
+  "path": "app/services/properties.py",
+  "edits": [
+   [
+    "        return None if np.isnat(value) else pd.Timestamp(value).isoformat()",
+    "        return to_json_safe(value.item())"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: skip the CRS transform (measure in source coordinates)",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return Plan(lonlat, projected=_transform(lonlat, WGS84, target), measurement_crs=target)",
+    "return Plan(lonlat, projected=lonlat, measurement_crs=target)"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_one_km_square_measures_one_million_m2"
+  ]
+ },
+ {
+  "name": "crs/measure: drop always_xy",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return Transformer.from_crs(source, target, always_xy=True)",
+    "return Transformer.from_crs(source, target)"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_crs.py::test_transformers_use_lon_lat_axis_order"
+  ]
+ },
+ {
+  "name": "crs/measure: always zone 43",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "zone = min(int((lon + 180) // 6) + 1, 60)",
+    "zone = 43"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_southern_hemisphere_feature_reports_a_327xx_code"
+  ]
+ },
+ {
+  "name": "crs/measure: always the northern hemisphere",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return (32600 if lat >= 0 else 32700) + zone",
+    "return 32600 + zone"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_crs.py::test_hemisphere_is_visible_only_in_the_code"
+  ]
+ },
+ {
+  "name": "crs/measure: no clamp at longitude 180",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "zone = min(int((lon + 180) // 6) + 1, 60)",
+    "zone = int((lon + 180) // 6) + 1"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: no UTM latitude limits",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "    if not UTM_MIN_LAT <= lat <= UTM_MAX_LAT:\n        return None\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: trust any projected CRS",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return crs.utm_zone is not None and crs.axis_info[0].unit_name in (\"metre\", \"meter\")",
+    "return not crs.is_geographic"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_web_mercator_source_is_not_measured_in_place"
+  ]
+ },
+ {
+  "name": "crs/measure: never measure UTM in place",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return crs.utm_zone is not None and crs.axis_info[0].unit_name in (\"metre\", \"meter\")",
+    "return False"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: no transformer cache",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "@lru_cache(maxsize=128)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: silently assume 4326 without the flag",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "return LayerCrs(WGS84, assumed=True)",
+    "return LayerCrs(WGS84, assumed=False)"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_crs.py::test_missing_crs_with_lon_lat_coordinates_is_assumed_4326_and_flagged",
+   "tests/test_processor.py::test_missing_prj_is_assumed_and_flagged"
+  ]
+ },
+ {
+  "name": "crs/measure: assume 4326 for any coordinates",
+  "path": "app/services/crs.py",
+  "edits": [
+   [
+    "if -180 <= min_x and max_x <= 180 and -90 <= min_y and max_y <= 90:",
+    "if True:"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: remove make_valid",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "geometry, repaired = _polygonal_parts(make_valid(geometry)), True",
+    "repaired = True"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_bowtie_is_repaired_and_both_halves_measured"
+  ]
+ },
+ {
+  "name": "crs/measure: measure whatever make_valid returns, lines as length",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "geometry, repaired = _polygonal_parts(make_valid(geometry)), True",
+    "geometry, repaired = make_valid(geometry), True"
+   ],
+   [
+    "measurement_type = \"area\" if kind in POLYGONAL else \"length\"",
+    "measurement_type = \"area\" if geometry.geom_type in POLYGONAL else \"length\""
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_polygon_that_repairs_to_lines_is_degenerate_not_a_length"
+  ]
+ },
+ {
+  "name": "crs/measure: abs() instead of orienting rings",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "GEOD.geometry_area_perimeter(shapely.orient_polygons(lonlat))",
+    "GEOD.geometry_area_perimeter(lonlat)"
+   ],
+   [
+    "    return area\n",
+    "    return abs(area)\n"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_multipolygon_with_mixed_orientation_sums_its_parts",
+   "tests/test_measure.py::test_hole_wound_like_its_exterior_is_still_subtracted"
+  ]
+ },
+ {
+  "name": "crs/measure: no orientation and no abs()",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "GEOD.geometry_area_perimeter(shapely.orient_polygons(lonlat))",
+    "GEOD.geometry_area_perimeter(lonlat)"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_clockwise_polygon_has_positive_geodesic_area"
+  ]
+ },
+ {
+  "name": "crs/measure: geodesic value equals the projected value",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "        measurement_type, \"projected\", projected, unit, geodesic,",
+    "        measurement_type, \"projected\", projected, unit, projected,"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_geodesic_value_is_independent_of_the_projection"
+  ]
+ },
+ {
+  "name": "crs/measure: drop the degenerate-area check",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "    return geometry.area <= 1e-9 * geometry.envelope.area",
+    "    return False"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: exact zero-area test",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "    return geometry.area <= 1e-9 * geometry.envelope.area",
+    "    return geometry.area == 0"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_measure.py::test_valid_zero_area_polygon_is_degenerate"
+  ]
+ },
+ {
+  "name": "crs/measure: note Z even when all zero",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "return bool((shapely.get_coordinates(geometry, include_z=True)[:, 2] != 0).any())",
+    "return True"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: points measured as nothing without a note",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "        return Measurement(notes=notes + [NOTE_POINT])",
+    "        return Measurement(notes=notes)"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: polar fallback without method",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "            measurement_type, \"geodesic\", geodesic, unit, geodesic,",
+    "            measurement_type, None, geodesic, unit, None,"
+   ]
+  ]
+ },
+ {
+  "name": "crs/measure: notes out of order",
+  "path": "app/services/measure.py",
+  "edits": [
+   [
+    "    notes = [NOTE_CRS_ASSUMED] if crs_assumed else []",
+    "    notes = []"
+   ]
+  ]
+ },
+ {
+  "name": "processor: remove the per-feature error boundary",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "    except Exception:\n        # measure() never raises for bad input, so this is a bug. Details go to the log,\n        # not to the user, the same policy as for file-level errors.\n        logger.exception(\"Feature %s of file %s could not be measured\", index, file_id)\n        row.measurement_type = MeasurementType.NONE\n        row.note = FEATURE_FAILED\n",
+    "    finally:\n        pass\n"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_processor.py::test_one_feature_that_raises_is_recorded_and_the_rest_complete"
+  ]
+ },
+ {
+  "name": "processor: keep the upload after processing",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "            path.unlink(missing_ok=True)\n\n        file.completed_at",
+    "            pass\n\n        file.completed_at"
+   ]
+  ]
+ },
+ {
+  "name": "processor: process files in any status",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "if file is None or file.status != FileStatus.PENDING:",
+    "if file is None:"
+   ]
+  ]
+ },
+ {
+  "name": "processor: no rollback after an unexpected error",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "            logger.exception(\"Unexpected error while processing file %s\", file_id)\n            session.rollback()",
+    "            logger.exception(\"Unexpected error while processing file %s\", file_id)"
+   ]
+  ]
+ },
+ {
+  "name": "processor: first layer's CRS wins (no MIXED)",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "    elif len(labels) > 1:\n        file.crs = MIXED_CRS",
+    "    elif len(labels) > 1:\n        file.crs = labels.pop()"
+   ]
+  ]
+ },
+ {
+  "name": "processor: crs_assumed not propagated to the file",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "    file.crs_assumed = any_assumed",
+    "    file.crs_assumed = False"
+   ]
+  ]
+ },
+ {
+  "name": "processor: recovery skips PROCESSING files",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "File.status.in_([FileStatus.PENDING, FileStatus.PROCESSING])",
+    "File.status.in_([FileStatus.PENDING])"
+   ]
+  ]
+ },
+ {
+  "name": "processor: recovery keeps the uploads",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "            settings.upload_path(file.id, file.format.value).unlink(missing_ok=True)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "processor: never set PROCESSING",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "        file.status = FileStatus.PROCESSING\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "processor: leak the internal error message",
+  "path": "app/services/processor.py",
+  "edits": [
+   [
+    "            file.error = UNEXPECTED",
+    "            file.error = UNEXPECTED + repr(__import__('sys').exc_info()[1])"
+   ]
+  ]
+ },
+ {
+  "name": "wiring: route imports the processor directly",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "from app.api.deps import ProcessorDep, SessionDep, SettingsDep\n",
+    "from app.api.deps import ProcessorDep, SessionDep, SettingsDep\nfrom app.services.processor import process_file  # noqa: F401\n"
+   ]
+  ],
+  "section_17": true,
+  "expect": [
+   "tests/test_architecture.py::test_routes_do_not_import_geospatial_libraries"
+  ]
+ },
+ {
+  "name": "wiring: upload schedules nothing",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    background_tasks.add_task(processor, record.id)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "wiring: startup recovery not run",
+  "path": "app/main.py",
+  "edits": [
+   [
+    "        recover_interrupted(engine, settings)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "wiring: real processor not wired",
+  "path": "app/main.py",
+  "edits": [
+   [
+    "    app.state.processor = partial(process_file, engine=engine, settings=settings)",
+    "    app.state.processor = lambda file_id: None"
+   ]
+  ]
+ },
+ {
+  "name": "file info: summary before completion",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    if file.status == FileStatus.COMPLETED:\n        totals",
+    "    if True:\n        totals"
+   ]
+  ]
+ },
+ {
+  "name": "file info: no 404 for unknown ids",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    if file is None:\n        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=\"File not found\")",
+    "    if False:\n        pass"
+   ]
+  ]
+ },
+ {
+  "name": "file info: hectares off by 10",
+  "path": "app/schemas/files.py",
+  "edits": [
+   [
+    "total_area_ha=round(area_m2 / 10_000, 4)",
+    "total_area_ha=round(area_m2 / 1000, 4)"
+   ]
+  ]
+ },
+ {
+  "name": "file info: length counted as area",
+  "path": "app/db/queries.py",
+  "edits": [
+   [
+    "        area_m2=sums.get(MeasurementType.AREA) or 0.0,",
+    "        area_m2=sum(sums.values()) or 0.0,"
+   ]
+  ]
+ },
+ {
+  "name": "file info: features without geometry not counted",
+  "path": "app/db/queries.py",
+  "edits": [
+   [
+    "by_type={(kind or NO_GEOMETRY): count for kind, count in sorted(counts, key=_type_order)}",
+    "by_type={kind: count for kind, count in sorted(counts, key=_type_order) if kind}"
+   ]
+  ]
+ },
+ {
+  "name": "file info: totals not rounded",
+  "path": "app/schemas/files.py",
+  "edits": [
+   [
+    "            total_area_m2=round(area_m2, 2),",
+    "            total_area_m2=area_m2,"
+   ]
+  ]
+ },
+ {
+  "name": "file info: slashless detail alias removed",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "@router.get(\"/{file_id}\", response_model=FileDetail, include_in_schema=False)\n",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "measurements: measurements served while PENDING",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    if file.status != FileStatus.COMPLETED:\n        raise HTTPException(status.HTTP_409_CONFLICT, detail=f\"File is still {file.status.value}\")",
+    "    if False:\n        pass"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: FAILED 409 without the reason",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "detail=f\"File processing FAILED: {file.error}\"",
+    "detail=\"File processing FAILED\""
+   ]
+  ]
+ },
+ {
+  "name": "measurements: include_geometry ignored",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    if include_geometry:\n        fields[\"geometry\"]",
+    "    if True:\n        fields[\"geometry\"]"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: geometry_type filter ignored",
+  "path": "app/db/queries.py",
+  "edits": [
+   [
+    "    if geometry_type is not None:\n        conditions.append",
+    "    if False:\n        conditions.append"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: count is the page size, not the total",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "        count=total,\n        limit=limit,\n        offset=offset,\n        results=[_measurement_item",
+    "        count=len(rows),\n        limit=limit,\n        offset=offset,\n        results=[_measurement_item"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: no exclude_unset (nulls instead of omitted keys)",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "    response_model_exclude_unset=True,\n    include_in_schema=False,",
+    "    include_in_schema=False,"
+   ],
+   [
+    "    response_model_exclude_unset=True,\n    responses=MEASUREMENTS_RESPONSES,",
+    "    responses=MEASUREMENTS_RESPONSES,"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: features out of file order",
+  "path": "app/db/queries.py",
+  "edits": [
+   [
+    ".order_by(Feature.feature_index)",
+    ".order_by(Feature.feature_index.desc())"
+   ]
+  ]
+ },
+ {
+  "name": "measurements: note field dropped from results",
+  "path": "app/api/files.py",
+  "edits": [
+   [
+    "        note=row.note,\n",
+    ""
+   ]
+  ]
+ }
+]
