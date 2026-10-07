@@ -149,8 +149,10 @@ model, upload with size middleware, list, health, architecture guard), **Stage 2
 (processor injected via `get_processor`, file information and measurements endpoints)
 and **Stage 5** (error messages, automated mutation checks) complete; see
 `docs/sessions/2026-10-07-stage1.md`. **Stage 6** (samples, Dockerfile, README,
-fresh-clone check) complete; see `docs/sessions/2026-10-07-stage6.md`. Left for
-submission: making the GitHub repository public, which is the user's call.
+fresh-clone check) complete, followed by a security review that added layer caps and a
+separate processing thread pool (D32) and a Docker test target (D33); see
+`docs/sessions/2026-10-07-stage6.md`. The repository is public. Left for submission:
+sharing the link, which is the user's step.
 Stages and exit criteria: `docs/WORKFLOWS.md` §13.
 
 Open questions are tracked in the newest session note, not here.

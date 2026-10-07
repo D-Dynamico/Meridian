@@ -109,4 +109,5 @@ One commit per substep. Push once per stage, only when its exit criteria pass.
 - [x] Sample files included and referenced in the README
 - [x] Fresh clone to working `/docs` in under five minutes, both with venv and Docker
 - [x] No em dashes in README or docs
-- [ ] Repository is public on GitHub and the link has been shared
+- [x] Repository is public on GitHub
+- [ ] The link has been shared with the reviewer
