@@ -11,33 +11,175 @@ measured in metres, and a geodesic value computed on the WGS84 ellipsoid is stor
 it as an independent cross-check. Anything that cannot be measured, or was assumed or
 repaired on the way, says so in the response.
 
-**Contents:** [Quick start](#quick-start) · [Sample files](#sample-files) ·
-[API](#api) · [Architecture](#architecture) · [CRS handling](#crs-handling) ·
-[Design decisions](#design-decisions) · [Testing](#testing) · [Learnings](#learnings) ·
+**Contents:** [Prerequisites](#prerequisites) · [Quick start](#quick-start) ·
+[Sample files](#sample-files) · [API](#api) · [Architecture](#architecture) ·
+[CRS handling](#crs-handling) · [Design decisions](#design-decisions) ·
+[Testing](#testing) · [Learnings](#learnings) ·
 [Limitations and future scope](#limitations-and-future-scope)
 
-## Quick start
+## Prerequisites
 
-Requires Python 3.12, or Docker. Everything runs offline: no API keys and no system GDAL
-(the pyogrio and pyproj wheels bundle GDAL and PROJ).
+- **git**.
+- **Python 3.12** for the virtual-environment path. Install it from
+  [python.org](https://www.python.org/downloads/). On Windows the installer adds the
+  `py` launcher, so the command is `py -3.12`; on macOS and Linux it is `python3.12`.
+- **Docker Desktop, installed and running**, for the Docker path. `docker info` should
+  print server details; if it reports that it cannot connect, start Docker Desktop and
+  wait until it says it is running.
+
+Nothing else: no API keys, no external services, and no system GDAL (the pyogrio and
+pyproj wheels bundle GDAL and PROJ). Everything runs offline once installed.
+
+## Quick start
 
 ```bash
 git clone https://github.com/D-Dynamico/Meridian.git
 cd Meridian
-
-# Either a virtual environment (on Windows: py -3.12, and .venv\Scripts\python)
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m uvicorn app.main:app
-
-# Or Docker (add -v meridian-data:/data to keep data between runs)
-docker build -t meridian .
-docker run --rm -p 8000:8000 meridian
 ```
 
-Open **http://127.0.0.1:8000/docs** and upload a file from `samples/` with "Try it out",
-or use `curl -F "file=@samples/survey.kml" http://127.0.0.1:8000/api/files/` (`curl.exe`
-in Windows PowerShell 5).
+### With a virtual environment
+
+Create and activate the environment with the lines for your shell:
+
+```bash
+# macOS / Linux
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# Windows PowerShell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# Windows Git Bash
+py -3.12 -m venv .venv
+source .venv/Scripts/activate
+```
+
+If PowerShell says running scripts is disabled, run
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` and activate again. It
+only affects that window.
+
+With the environment active, every command is the same in every shell:
+
+```bash
+python -m pip install -r requirements-dev.txt   # the app plus the test tools
+python -m pytest -q                             # the test suite, offline
+python -m uvicorn app.main:app                  # serves http://127.0.0.1:8000
+```
+
+### With Docker
+
+```bash
+docker build -t meridian .
+docker run --rm -p 8000:8000 meridian           # add -v meridian-data:/data to keep data
+```
+
+The first build downloads the `python:3.12-slim` base image, about 180 MB.
+
+To run the test suite with nothing installed but Docker, build the separate test image:
+
+```bash
+docker build --target test -t meridian-test .
+docker run --rm meridian-test
+```
+
+The runtime image contains only the app; the test image adds the tests and test tools
+(`docs/DECISIONS.md` D33). Inside it, 8 tests that inspect the git checkout are skipped,
+because there is no `.git` in the image.
+
+### Try it
+
+Open **http://127.0.0.1:8000/docs** to use the API from the browser ("Try it out"), or
+run the reviewer loop from a second terminal in the `Meridian` folder. In Windows
+PowerShell 5.1, type `curl.exe` instead of `curl`; PowerShell 7 and every other shell
+run `curl` as written.
+
+**1. Upload a sample.** The answer is 202 with the file's id, as soon as the file is
+saved:
+
+```bash
+curl -F "file=@samples/survey.kml" http://127.0.0.1:8000/api/files/
+```
+
+```json
+{"id":"7d7c6e71-d1f0-428e-9c58-caf913680f93","filename":"survey.kml","status":"PENDING"}
+```
+
+**2. Check the file until its status is `COMPLETED`.** Replace `FILE_ID` with the id
+from step 1. Processing runs in the background, so the first check may still say
+`PENDING` or `PROCESSING`:
+
+```bash
+curl http://127.0.0.1:8000/api/files/FILE_ID/
+```
+
+```json
+{"id":"7d7c6e71-d1f0-428e-9c58-caf913680f93","filename":"survey.kml","format":"KML","feature_count":null,"crs":null,"crs_assumed":false,"status":"PROCESSING","error":null,"created_at":"2026-10-07T04:02:30.388546Z","completed_at":null,"summary":null}
+```
+
+Run it again:
+
+```json
+{
+  "id": "7d7c6e71-d1f0-428e-9c58-caf913680f93",
+  "filename": "survey.kml",
+  "format": "KML",
+  "feature_count": 5,
+  "crs": "EPSG:4326",
+  "crs_assumed": false,
+  "status": "COMPLETED",
+  "error": null,
+  "created_at": "2026-10-07T04:02:30.388546Z",
+  "completed_at": "2026-10-07T04:02:30.540594Z",
+  "summary": {
+    "by_type": { "GeometryCollection": 1, "LineString": 1, "Point": 1, "Polygon": 2 },
+    "total_area_m2": 1124231.85,
+    "total_area_ha": 112.4232,
+    "total_length_m": 999.68,
+    "total_length_km": 0.9997
+  }
+}
+```
+
+**3. Get the measurements.** Asked for too early, this answers 409
+`{"detail":"File is still PROCESSING"}`. Once the file is `COMPLETED`:
+
+```bash
+curl http://127.0.0.1:8000/api/files/FILE_ID/measurements/
+```
+
+```json
+{
+  "file_id": "7d7c6e71-d1f0-428e-9c58-caf913680f93",
+  "count": 5,
+  "limit": 100,
+  "offset": 0,
+  "results": [
+    {
+      "index": 0,
+      "layer": "Parcels",
+      "geometry_type": "Polygon",
+      "source_crs": "EPSG:4326",
+      "measurement_method": "projected",
+      "measurement_crs": "EPSG:32643",
+      "measurement": { "type": "area", "value": 999314.22, "unit": "m2", "hectares": 99.9314 },
+      "geodesic_value": 999960.24,
+      "repaired": false,
+      "note": null,
+      "properties": { "Name": "Plot 12", "owner": "Asha Verma", "survey_no": "112/3" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[75.79, 26.91, 0.0], [75.80006706831594, 26.909999641154368, 0.0],
+                         [75.80006706831594, 26.919024734600363, 0.0],
+                         [75.79, 26.919025093445534, 0.0], [75.79, 26.91, 0.0]]]
+      }
+    }
+  ]
+}
+```
+
+Trimmed to the first of the five results; the [sample files](#sample-files) table lists
+all five. `samples/parcels.zip` goes through the same loop.
 
 Optional settings: `MERIDIAN_DATA_DIR` (default `data/`, `/data` in Docker) and
 `MERIDIAN_MAX_UPLOAD_MB` (default 50).
@@ -76,62 +218,16 @@ amount. That gap is the UTM scale factor, not an error, and is explained under
 | GET | `/api/files/` | List uploads, newest first (extra) | 200 |
 | GET | `/health` | Liveness check (extra) | 200 |
 
-The full reference, with every query parameter and error message, is
-[`docs/API.md`](docs/API.md). Real responses for `samples/survey.kml`:
+[Try it](#try-it) shows real responses from the first three. The full reference, with
+every query parameter and error message, is [`docs/API.md`](docs/API.md).
 
-**Upload** returns 202 as soon as the file is saved. Status then moves from `PENDING` to
-`PROCESSING` to `COMPLETED` or `FAILED`.
-
-```json
-{ "id": "474546b6-4620-46a5-acfd-a4cebff0eaa8", "filename": "survey.kml", "status": "PENDING" }
-```
-
-**File information**, `GET /api/files/{id}/`:
-
-```json
-{
-  "id": "474546b6-4620-46a5-acfd-a4cebff0eaa8",
-  "filename": "survey.kml",
-  "format": "KML",
-  "feature_count": 5,
-  "crs": "EPSG:4326",
-  "crs_assumed": false,
-  "status": "COMPLETED",
-  "error": null,
-  "created_at": "2026-10-06T21:45:39.882893Z",
-  "completed_at": "2026-10-06T21:45:40.037748Z",
-  "summary": {
-    "by_type": { "GeometryCollection": 1, "LineString": 1, "Point": 1, "Polygon": 2 },
-    "total_area_m2": 1124231.85,
-    "total_area_ha": 112.4232,
-    "total_length_m": 999.68,
-    "total_length_km": 0.9997
-  }
-}
-```
-
-**Measurements**, `GET /api/files/{id}/measurements/`, one result from the page (the
-repaired plot, with `include_geometry=false`):
-
-```json
-{
-  "index": 1,
-  "layer": "Parcels",
-  "geometry_type": "Polygon",
-  "source_crs": "EPSG:4326",
-  "measurement_method": "projected",
-  "measurement_crs": "EPSG:32643",
-  "measurement": { "type": "area", "value": 124917.62, "unit": "m2", "hectares": 12.4918 },
-  "geodesic_value": 124997.51,
-  "repaired": true,
-  "note": "Repaired invalid geometry",
-  "properties": { "Name": "Plot 14", "owner": "R. Meena", "survey_no": "114/1" }
-}
-```
-
-Every result carries every field, with null where there is no value. `value` is in `m2`
-or `m`; hectares and km are convenience fields beside it. `geometry` (GeoJSON in the
-source CRS) is included by default. Pages take `limit`, `offset` and `geometry_type`.
+Status moves from `PENDING` to `PROCESSING` to `COMPLETED` or `FAILED`. In a measurement
+result, every field is present, with null where there is no value. `value` is in `m2` or
+`m`; hectares and km are convenience fields beside it. `measurement_method` says whether
+the value was projected (in `measurement_crs`, a UTM zone) or geodesic, and
+`geodesic_value` is the cross-check. `geometry` is GeoJSON in the source CRS; pass
+`include_geometry=false` to leave it out. Pages take `limit`, `offset` and
+`geometry_type`.
 
 **Errors** are `{"detail": "<reason>"}`: 415 for an unsupported extension, 413 over the
 size limit, 404 for an unknown id, and 409 for measurements before the file is
@@ -280,10 +376,8 @@ alternatives considered for each.
 
 ## Testing
 
-```bash
-.venv/bin/python -m pytest -q                                      # 237 tests, about 12 s, offline
-docker run --rm meridian python -m pytest -q -p no:cacheprovider   # the same suite on Linux
-```
+237 tests, offline. Run them with `python -m pytest -q` in the activated environment, or
+with Docker alone (see [Quick start](#with-docker)).
 
 - **Accuracy fixtures are built on the ground** with `Geod.fwd`. A square drawn in UTM
   and measured in the same zone is always exactly 1,000,000 m2, so it would pass with the
