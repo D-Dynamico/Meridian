@@ -1,4 +1,5 @@
-# Pinned for reproducible installs. Tested on Python 3.12 (docs/DECISIONS.md D23).
+# Runtime dependencies, pinned for reproducible installs. Tested on Python 3.12
+# (docs/DECISIONS.md D23). Test tools are in requirements-dev.txt (D33).
 
 # API
 fastapi==0.142.2
@@ -11,8 +12,3 @@ geopandas==1.2.0
 pyogrio==0.13.0
 shapely==2.1.2
 pyproj==3.8.0
-
-# Tests
-pytest==9.1.1
-# Starlette 1.7 deprecates httpx for its TestClient in favour of httpx2.
-httpx2==2.13.1

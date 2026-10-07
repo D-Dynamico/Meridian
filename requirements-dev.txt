@@ -1,0 +1,7 @@
+# Everything needed to run the test suite: the runtime dependencies plus test tools.
+# The Docker runtime image installs only requirements.txt (docs/DECISIONS.md D33).
+-r requirements.txt
+
+pytest==9.1.1
+# Starlette 1.7 deprecates httpx for its TestClient in favour of httpx2.
+httpx2==2.13.1

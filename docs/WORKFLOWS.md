@@ -9,7 +9,8 @@ Target: a reviewer goes from fresh clone to a working `/docs` page in under five
 
 - Python 3.12 (`DECISIONS.md` D23). The Docker image is `python:3.12-slim`.
 - A virtual environment in `.venv/`. On Windows the interpreter is under `.venv/Scripts/`.
-- All dependencies pinned in `requirements.txt`. pyogrio wheels bundle GDAL, so no system
+- All dependencies pinned: runtime in `requirements.txt`, test tools in `requirements-dev.txt`
+  (which includes the runtime file). pyogrio wheels bundle GDAL, so no system
   GDAL install should be needed. If a platform needs one, document it in the README.
 - No environment variables are required. Optional settings (upload limit, data directory)
   have defaults in `app/core/config.py`.

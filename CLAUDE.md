@@ -64,7 +64,7 @@ Rationale for each choice: `docs/DECISIONS.md` §10.
 
 ```
 py -3.12 -m venv .venv                                  # Linux/macOS: python3.12 -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt # Linux/macOS: .venv/bin/python
+.venv/Scripts/python -m pip install -r requirements-dev.txt # Linux/macOS: .venv/bin/python
 .venv/Scripts/python -m uvicorn app.main:app --reload   # then open http://127.0.0.1:8000/docs
 .venv/Scripts/python -m pytest -q                       # offline, no fixtures downloaded
 .venv/Scripts/python scripts/mutation_check.py --check  # after a refactor: patterns still match?
@@ -72,12 +72,13 @@ py -3.12 -m venv .venv                                  # Linux/macOS: python3.1
 .venv/Scripts/python scripts/make_samples.py            # regenerate samples/ (tests pin them)
 docker build -t meridian .                              # about 2 minutes on a cold cache
 docker run --rm -p 8000:8000 meridian                   # add -v meridian-data:/data to keep data
-docker run --rm meridian python -m pytest -q -p no:cacheprovider   # suite on Linux
+docker build --target test -t meridian-test . && docker run --rm meridian-test   # suite on Linux
 ```
 
 Optional environment: `MERIDIAN_DATA_DIR` (default `data/`, `/data` in Docker),
-`MERIDIAN_MAX_UPLOAD_MB` (default 50). Inside Docker the code folder is read-only to the
-`meridian` user, so pytest's cache must be disabled there.
+`MERIDIAN_MAX_UPLOAD_MB` (default 50). Runtime dependencies are in `requirements.txt`,
+test tools in `requirements-dev.txt`, which includes it. The runtime image has no tests;
+the `test` build target does (D33).
 
 **File tooling on Windows:** always pass `encoding="utf-8"` when a script reads or writes
 repo files. The default is cp1252, which double-encodes `§` on the way back out.

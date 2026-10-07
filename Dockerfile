@@ -1,12 +1,15 @@
-# Meridian API (docs/DECISIONS.md D23).
+# Meridian API (docs/DECISIONS.md D23, D33).
 #
-#   docker build -t meridian .
-#   docker run --rm -p 8000:8000 meridian   # then open http://127.0.0.1:8000/docs
-#   docker run --rm meridian python -m pytest -q -p no:cacheprovider   # tests, on Linux
+#   docker build -t meridian .                          # the runtime image (last stage)
+#   docker run --rm -p 8000:8000 meridian               # then open http://127.0.0.1:8000/docs
+#   docker build --target test -t meridian-test .       # runtime plus tests and test tools
+#   docker run --rm meridian-test                       # runs the test suite on Linux
 #
 # No system GDAL or PROJ: the pyogrio and pyproj wheels bundle both, including the LIBKML
 # driver the KML loader relies on, so the slim image needs no apt packages.
-FROM python:3.12-slim
+
+# Shared by both targets: runtime dependencies, the app, and an unprivileged user.
+FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -20,18 +23,31 @@ WORKDIR /srv/meridian
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Tests, scripts and samples are included so the suite can run inside the image: some
-# guards (backslash zip-slip) only do real work on Linux.
-COPY pyproject.toml ./
 COPY app ./app
-COPY tests ./tests
-COPY scripts ./scripts
-COPY samples ./samples
 
-# Run as an unprivileged user. /data holds the SQLite database and upload temp folders.
+# /data holds the SQLite database and upload temp folders. The code stays owned by root,
+# so the app cannot modify itself; only /data is writable.
 RUN useradd --create-home --uid 1000 meridian \
     && mkdir /data \
     && chown meridian /data
+
+
+# The test suite on Linux, where some guards (backslash zip-slip) do real work. Built
+# only on request, so the runtime image carries no test tools, tests or samples.
+FROM base AS test
+COPY requirements-dev.txt .
+RUN pip install -r requirements-dev.txt
+COPY pyproject.toml ./
+COPY tests ./tests
+COPY scripts ./scripts
+COPY samples ./samples
+USER meridian
+# The code folder is read-only to this user, so pytest must not try to write its cache.
+CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
+
+
+# The runtime image. Last, so a plain "docker build" produces it.
+FROM base AS runtime
 USER meridian
 VOLUME /data
 
